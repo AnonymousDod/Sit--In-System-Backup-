@@ -2,9 +2,32 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 import os
 from werkzeug.utils import secure_filename
-from models import db, User, Feedback, Announcement
+from models import db, User, Feedback, Announcement, Reservation, Session
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from functools import wraps
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in to access this page.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in to access this page.', 'error')
+            return redirect(url_for('index'))
+        user = User.query.filter_by(id_number=session['user_id']).first()
+        if not user or not user.is_admin:
+            flash('Unauthorized access. Admin privileges required.', 'error')
+            return redirect(url_for('home'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'  # Change this to a secure secret key
@@ -88,6 +111,25 @@ def home():
     active_announcements = Announcement.query.filter_by(is_active=True).order_by(Announcement.created_at.desc()).all()
     return render_template('home.html', user=user, announcements=active_announcements)
 
+@app.route('/user/session-history')
+@login_required
+def user_session_history():
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    if not user:
+        flash('User not found', 'error')
+        return redirect(url_for('home'))
+    
+    # Get all completed sessions for the user, ordered by end time
+    sessions = Session.query.filter_by(user_id=user.id, status='completed').order_by(Session.end_time.desc()).all()
+    
+    # Calculate total hours spent in sessions
+    total_hours = sum((session.end_time - session.start_time).total_seconds() / 3600 for session in sessions)
+    
+    return render_template('user_session_history.html', 
+                         sessions=sessions,
+                         total_hours=round(total_hours, 2),
+                         remaining_sessions=user.remaining_sessions)
+
 @app.route('/admin')
 def admin_dashboard():
     if 'user_id' not in session:
@@ -100,30 +142,40 @@ def admin_dashboard():
     
     # Get statistics for admin dashboard
     total_users = User.query.filter_by(is_admin=False).count()  # Exclude admin users from count
-    active_reservations = 0  # You'll implement this with actual reservations
-    total_reservations = 0  # You'll implement this with actual reservations
+    active_sessions = Session.query.filter_by(status='active').count()  # Count active sessions instead of reservations
+    total_reservations = Reservation.query.count()
+    completed_sessions = Session.query.filter_by(status='completed').count()  # Add completed sessions count
     
-    # Sample announcements (you'll implement this with a database model later)
-    announcements = [
-        {
-            'title': 'System Maintenance',
-            'content': 'The laboratory system will undergo maintenance on Saturday.',
-            'type': 'Normal',
-            'timestamp': 'Apr 11, 02:59 AM'
-        },
-        {
-            'title': 'New Laboratory Rules',
-            'content': 'Please check the updated laboratory rules and guidelines.',
-            'type': 'Normal',
-            'timestamp': 'Apr 10, 10:30 AM'
-        }
-    ]
+    # Get purpose statistics for the chart
+    purpose_stats = db.session.query(
+        Session.purpose,
+        db.func.count(Session.id).label('count')
+    ).filter(Session.status == 'completed').group_by(Session.purpose).all()
+    
+    # Convert to dictionary format for the chart
+    purpose_data = {
+        'labels': [purpose for purpose, _ in purpose_stats],
+        'data': [count for _, count in purpose_stats]
+    }
+    
+    # Get announcements from database
+    announcements = Announcement.query.order_by(Announcement.created_at.desc()).limit(5).all()
+    
+    # Get all users for the users container
+    users = User.query.filter_by(is_admin=False).order_by(User.last_name).all()
+    
+    # Get recent reservations (last 5) with user information
+    recent_reservations = Reservation.query.join(User).order_by(Reservation.date.desc(), Reservation.time.desc()).limit(5).all()
     
     return render_template('admin_dashboard.html',
                          total_users=total_users,
-                         active_reservations=active_reservations,
+                         active_reservations=active_sessions,  # Pass active sessions count
                          total_reservations=total_reservations,
-                         announcements=announcements)
+                         completed_sessions=completed_sessions,  # Pass completed sessions count
+                         announcements=announcements,
+                         users=users,
+                         recent_reservations=recent_reservations,
+                         purpose_data=purpose_data)  # Add purpose data for the chart
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -318,6 +370,22 @@ def mark_feedback_read(feedback_id):
     flash('Feedback marked as read', 'success')
     return redirect(url_for('admin_feedback'))
 
+@app.route('/admin/feedback/<int:feedback_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_feedback(feedback_id):
+    feedback = Feedback.query.get_or_404(feedback_id)
+    
+    try:
+        db.session.delete(feedback)
+        db.session.commit()
+        flash('Feedback deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error deleting feedback', 'error')
+    
+    return redirect(url_for('admin_feedback'))
+
 @app.route('/admin/announcements', methods=['GET', 'POST'])
 def admin_announcements():
     if 'user_id' not in session:
@@ -445,6 +513,471 @@ def toggle_announcement(id):
         flash('Error updating announcement status', 'error')
     
     return redirect(url_for('admin_announcements'))
+
+@app.route('/admin/users/<int:user_id>/toggle', methods=['POST'])
+def toggle_user_status(user_id):
+    if 'user_id' not in session:
+        return redirect(url_for('index'))
+    
+    admin = User.query.filter_by(id_number=session['user_id']).first()
+    if not admin or not admin.is_admin:
+        flash('Unauthorized access', 'error')
+        return redirect(url_for('home'))
+    
+    user = User.query.get_or_404(user_id)
+    user.is_active = not user.is_active
+    
+    try:
+        db.session.commit()
+        status = 'activated' if user.is_active else 'deactivated'
+        flash(f'User {status} successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error updating user status', 'error')
+    
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+def delete_user(user_id):
+    if 'user_id' not in session:
+        return redirect(url_for('index'))
+    
+    admin = User.query.filter_by(id_number=session['user_id']).first()
+    if not admin or not admin.is_admin:
+        flash('Unauthorized access', 'error')
+        return redirect(url_for('home'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        flash('User deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error deleting user', 'error')
+    
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    users = User.query.filter_by(is_admin=False).order_by(User.last_name).all()
+    return render_template('admin_users.html', users=users)
+
+class LabResource(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(500))
+    link = db.Column(db.String(500))
+    is_enabled = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+@app.route('/admin/resources')
+@login_required
+@admin_required
+def admin_resources():
+    resources = LabResource.query.all()
+    return render_template('admin_resources.html', resources=resources)
+
+@app.route('/admin/resources/add', methods=['POST'])
+@login_required
+@admin_required
+def add_resource():
+    name = request.form.get('name')
+    description = request.form.get('description', 'None')
+    link = request.form.get('link', '-')
+    
+    if not name:
+        flash('Resource name is required', 'error')
+        return redirect(url_for('admin_resources'))
+    
+    resource = LabResource(
+        name=name,
+        description=description,
+        link=link
+    )
+    
+    try:
+        db.session.add(resource)
+        db.session.commit()
+        flash('Resource added successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error adding resource', 'error')
+    
+    return redirect(url_for('admin_resources'))
+
+@app.route('/admin/resources/<int:resource_id>/toggle', methods=['POST'])
+@login_required
+@admin_required
+def toggle_resource(resource_id):
+    resource = LabResource.query.get_or_404(resource_id)
+    resource.is_enabled = not resource.is_enabled
+    
+    try:
+        db.session.commit()
+        status = 'enabled' if resource.is_enabled else 'disabled'
+        flash(f'Resource {status} successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error updating resource status', 'error')
+    
+    return redirect(url_for('admin_resources'))
+
+@app.route('/admin/resources/<int:resource_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_resource(resource_id):
+    resource = LabResource.query.get_or_404(resource_id)
+    
+    try:
+        db.session.delete(resource)
+        db.session.commit()
+        flash('Resource deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error deleting resource', 'error')
+    
+    return redirect(url_for('admin_resources'))
+
+@app.route('/resources')
+@login_required
+def user_resources():
+    # Only show enabled resources to regular users
+    resources = LabResource.query.filter_by(is_enabled=True).all()
+    return render_template('user_resources.html', resources=resources)
+
+@app.route('/reservations')
+@login_required
+def user_reservations():
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    reservations = Reservation.query.filter_by(user_id=user.id).order_by(Reservation.date.desc(), Reservation.time.desc()).all()
+    return render_template('user_reservations.html', reservations=reservations)
+
+@app.route('/submit_reservation', methods=['POST'])
+@login_required
+def submit_reservation():
+    if 'user_id' not in session:
+        return redirect(url_for('index'))
+    
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    if not user:
+        flash('User not found', 'error')
+        return redirect(url_for('home'))
+    
+    try:
+        date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
+        time = datetime.strptime(request.form.get('time'), '%H:%M').time()
+        purpose = request.form.get('purpose')
+        laboratory_unit = request.form.get('laboratory_unit')
+        
+        if not all([date, time, purpose, laboratory_unit]):
+            flash('Please fill in all fields', 'error')
+            return redirect(url_for('home'))
+        
+        # Check for existing reservations at the same time
+        existing_reservation = Reservation.query.filter_by(
+            date=date,
+            time=time,
+            laboratory_unit=laboratory_unit,
+            status='approved'
+        ).first()
+        
+        if existing_reservation:
+            flash('This time slot is already reserved', 'error')
+            return redirect(url_for('home'))
+        
+        # Create new reservation
+        new_reservation = Reservation(
+            user_id=user.id,
+            date=date,
+            time=time,
+            purpose=purpose,
+            laboratory_unit=laboratory_unit
+        )
+        
+        db.session.add(new_reservation)
+        db.session.commit()
+        
+        flash('Reservation submitted successfully!', 'success')
+        
+    except Exception as e:
+        flash('An error occurred while submitting reservation', 'error')
+        print(f"Error submitting reservation: {str(e)}")
+    
+    return redirect(url_for('home'))
+
+@app.route('/admin/reservations')
+@login_required
+@admin_required
+def admin_reservations():
+    # Get all reservations with user information, ordered by date and time, excluding completed ones
+    reservations = Reservation.query.join(User).filter(Reservation.status != 'completed').order_by(Reservation.date.desc(), Reservation.time.desc()).all()
+    
+    # Calculate statistics
+    stats = {
+        'total': Reservation.query.filter(Reservation.status != 'completed').count(),
+        'active': Reservation.query.filter_by(status='approved').count(),
+        'pending': Reservation.query.filter_by(status='pending').count()
+    }
+    
+    return render_template('admin_reservations.html', reservations=reservations, stats=stats)
+
+@app.route('/admin/reservations/<int:reservation_id>/status', methods=['POST'])
+@login_required
+@admin_required
+def update_reservation_status(reservation_id):
+    reservation = Reservation.query.get_or_404(reservation_id)
+    data = request.get_json()
+    new_status = data.get('status')
+    
+    if new_status not in ['approved', 'rejected']:
+        return jsonify({'success': False, 'message': 'Invalid status'}), 400
+    
+    try:
+        # If approving, check for conflicts
+        if new_status == 'approved':
+            existing_reservation = Reservation.query.filter(
+                Reservation.date == reservation.date,
+                Reservation.time == reservation.time,
+                Reservation.laboratory_unit == reservation.laboratory_unit,
+                Reservation.status == 'approved',
+                Reservation.id != reservation.id
+            ).first()
+            
+            if existing_reservation:
+                return jsonify({
+                    'success': False, 
+                    'message': 'This time slot is already reserved by another user'
+                }), 409
+        
+        reservation.status = new_status
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': f'Reservation {new_status} successfully!'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error updating reservation status: {str(e)}'
+        }), 500
+
+@app.route('/admin/reservations/<int:reservation_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_reservation(reservation_id):
+    reservation = Reservation.query.get_or_404(reservation_id)
+    
+    try:
+        db.session.delete(reservation)
+        db.session.commit()
+        flash('Reservation deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error deleting reservation', 'error')
+    
+    return redirect(url_for('admin_reservations'))
+
+@app.route('/admin/sessions', methods=['GET'])
+@login_required
+def admin_sessions():
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    if not user or not user.is_admin:
+        flash('Access denied. Admin privileges required.', 'error')
+        return redirect(url_for('home'))
+    
+    # Get all active sessions
+    active_sessions = Session.query.filter_by(status='active').join(User).order_by(Session.start_time.desc()).all()
+    
+    # Get statistics
+    total_sessions = Session.query.count()
+    active_sessions_count = Session.query.filter_by(status='active').count()
+    completed_sessions_count = Session.query.filter_by(status='completed').count()
+    
+    stats = {
+        'total': total_sessions,
+        'active': active_sessions_count,
+        'completed': completed_sessions_count
+    }
+    
+    return render_template('admin_sessions.html', sessions=active_sessions, stats=stats)
+
+@app.route('/admin/sessions/start', methods=['POST'])
+@login_required
+def start_session():
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    if not user or not user.is_admin:
+        return jsonify({'error': 'Access denied. Admin privileges required.'}), 403
+    
+    data = request.get_json()
+    id_number = data.get('id_number')
+    purpose = data.get('purpose')
+    laboratory_unit = data.get('laboratory_unit')
+    
+    if not all([id_number, purpose, laboratory_unit]):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    # Find user by ID number
+    user = User.query.filter_by(id_number=id_number).first()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Check if user has remaining sessions
+    if user.remaining_sessions <= 0:
+        return jsonify({'error': 'User has no remaining sessions'}), 400
+    
+    # Create new session
+    session = Session(
+        user_id=user.id,
+        purpose=purpose,
+        laboratory_unit=laboratory_unit
+    )
+    
+    try:
+        # Decrement remaining sessions
+        user.remaining_sessions -= 1
+        db.session.add(session)
+        db.session.commit()
+        return jsonify({
+            'message': 'Session started successfully',
+            'session': session.to_dict(),
+            'remaining_sessions': user.remaining_sessions
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/sessions/<int:session_id>/end', methods=['POST'])
+@login_required
+def end_session(session_id):
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    if not user or not user.is_admin:
+        return jsonify({'error': 'Access denied. Admin privileges required.'}), 403
+    
+    lab_session = Session.query.get_or_404(session_id)
+    
+    if lab_session.status == 'completed':
+        return jsonify({'error': 'Session already completed'}), 400
+    
+    try:
+        lab_session.status = 'completed'
+        lab_session.end_time = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'message': 'Session ended successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/sessions/<int:session_id>', methods=['DELETE'])
+@login_required
+def delete_session(session_id):
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    if not user or not user.is_admin:
+        return jsonify({'error': 'Access denied. Admin privileges required.'}), 403
+    
+    session = Session.query.get_or_404(session_id)
+    
+    try:
+        db.session.delete(session)
+        db.session.commit()
+        return jsonify({'message': 'Session deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/sessions/start/<int:reservation_id>', methods=['POST'])
+@login_required
+@admin_required
+def start_session_from_reservation(reservation_id):
+    reservation = Reservation.query.get_or_404(reservation_id)
+    
+    if reservation.status != 'approved':
+        return jsonify({
+            'success': False,
+            'message': 'Cannot start session from unapproved reservation'
+        }), 400
+    
+    try:
+        # Get the user
+        user = User.query.get(reservation.user_id)
+        
+        # Check if user has remaining sessions
+        if user.remaining_sessions <= 0:
+            return jsonify({
+                'success': False,
+                'message': 'User has no remaining sessions'
+            }), 400
+        
+        # Create new session from reservation
+        session = Session(
+            user_id=reservation.user_id,
+            purpose=reservation.purpose,
+            laboratory_unit=reservation.laboratory_unit,
+            start_time=datetime.utcnow()
+        )
+        
+        # Decrement remaining sessions
+        user.remaining_sessions -= 1
+        
+        # Delete the reservation after starting the session
+        db.session.add(session)
+        db.session.delete(reservation)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Session started successfully',
+            'remaining_sessions': user.remaining_sessions
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error starting session: {str(e)}'
+        }), 500
+
+@app.route('/admin/session-history')
+@login_required
+@admin_required
+def session_history():
+    # Get all completed sessions with user information, ordered by end time
+    sessions = Session.query.filter_by(status='completed').join(User).order_by(Session.end_time.desc()).all()
+    
+    # Get statistics
+    total_sessions = Session.query.filter_by(status='completed').count()
+    total_duration = sum((session.end_time - session.start_time).total_seconds() / 3600 for session in sessions)  # Total hours
+    
+    stats = {
+        'total': total_sessions,
+        'total_hours': round(total_duration, 2)
+    }
+    
+    return render_template('session_history.html', sessions=sessions, stats=stats)
+
+@app.route('/admin/users/<int:user_id>/reset-sessions', methods=['POST'])
+@login_required
+@admin_required
+def reset_user_sessions(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    try:
+        user.remaining_sessions = 30
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': 'User sessions reset successfully',
+            'remaining_sessions': user.remaining_sessions
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error resetting sessions: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
     init_db()  # Initialize database and create admin user

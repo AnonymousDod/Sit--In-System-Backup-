@@ -133,6 +133,7 @@
             gap: 1rem;
             cursor: pointer;
             transition: all 0.3s ease;
+            position: relative;
         }
 
         .action-card:hover {
@@ -162,6 +163,13 @@
 
         .action-info {
             flex: 1;
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .action-card:hover .action-info {
+            color: var(--white);
         }
 
         .action-title {
@@ -480,6 +488,201 @@
             pointer-events: none;
             cursor: not-allowed;
         }
+
+        .users-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--white);
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            z-index: 1000;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .action-card:hover .users-dropdown {
+            display: block;
+        }
+
+        .users-dropdown table {
+            margin-bottom: 0;
+        }
+
+        .users-dropdown .btn-group {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .users-dropdown .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .users-dropdown .badge {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .announcements-dropdown {
+            display: none;
+        }
+
+        .action-card:hover .announcements-dropdown {
+            display: none;
+        }
+
+        .announcements-header {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 1rem;
+        }
+
+        .announcements-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .announcement-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            background: var(--white);
+        }
+
+        .announcement-item:last-child {
+            border-bottom: none;
+        }
+
+        .announcement-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .announcement-title h3 {
+            font-size: 0.875rem;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        .announcement-content {
+            color: var(--text-light);
+            font-size: 0.75rem;
+            margin-bottom: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .announcement-time {
+            color: var(--text-light);
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge.normal {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .badge.important {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .badge.urgent {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .reservations-dropdown {
+            display: none;
+        }
+
+        .action-card:hover .reservations-dropdown {
+            display: none;
+        }
+
+        .reservations-header {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 1rem;
+        }
+
+        .reservations-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .reservation-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            background: var(--white);
+        }
+
+        .reservation-item:last-child {
+            border-bottom: none;
+        }
+
+        .reservation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .reservation-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .reservation-purpose {
+            color: var(--text-light);
+            font-size: 0.75rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .badge.bg-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .badge.bg-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .badge.bg-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .badge.bg-secondary {
+            background: #6b7280;
+            color: white;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -525,34 +728,34 @@
 
     <main class="main-content">
         <div class="quick-actions">
-            <div class="action-card">
+            <div class="action-card" data-url="{{ url_for('admin_users') }}">
                 <div class="action-icon">
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="action-info">
-                    <div class="action-title">Users</div>
-                    <div class="action-description">Manage student accounts and permissions</div>
+                    <h3>Users</h3>
+                    <p>Manage system users</p>
                 </div>
             </div>
             <div class="action-card">
                 <div class="action-icon">
                     <i class="fas fa-desktop"></i>
                 </div>
-                <div class="action-info">
+                <a href="{{ url_for('admin_resources') }}" class="action-info">
                     <div class="action-title">Lab Resources</div>
                     <div class="action-description">Manage laboratory computers and equipment</div>
-                </div>
+                </a>
             </div>
-            <div class="action-card">
+            <div class="action-card" data-url="{{ url_for('admin_reservations') }}">
                 <div class="action-icon">
                     <i class="fas fa-calendar-check"></i>
                 </div>
                 <div class="action-info">
-                    <div class="action-title">Reservations</div>
-                    <div class="action-description">View and manage student reservations</div>
+                    <h3>Reservations</h3>
+                    <p>Manage laboratory reservations</p>
                 </div>
             </div>
-            <div class="action-card">
+            <div class="action-card" data-url="{{ url_for('admin_sessions') }}">
                 <div class="action-icon">
                     <i class="fas fa-clock"></i>
                 </div>
@@ -561,7 +764,7 @@
                     <div class="action-description">Monitor current laboratory sessions</div>
                 </div>
             </div>
-            <div class="action-card">
+            <div class="action-card" data-url="{{ url_for('session_history') }}">
                 <div class="action-icon">
                     <i class="fas fa-history"></i>
                 </div>
@@ -579,22 +782,22 @@
                     <div class="action-description">Generate usage and activity reports</div>
                 </div>
             </div>
-            <div class="action-card">
+            <div class="action-card" data-url="{{ url_for('admin_announcements') }}">
                 <div class="action-icon">
                     <i class="fas fa-bullhorn"></i>
                 </div>
                 <div class="action-info">
-                    <div class="action-title">Announcements</div>
-                    <div class="action-description">Manage system announcements</div>
+                    <h3>Announcements</h3>
+                    <p>Manage system announcements</p>
                 </div>
             </div>
-            <div class="action-card" data-href="{{ url_for('admin_feedback') }}">
+            <div class="action-card" data-url="{{ url_for('admin_feedback') }}">
                 <div class="action-icon">
                     <i class="fas fa-comments"></i>
                 </div>
                 <div class="action-info">
-                    <div class="action-title">Feedback</div>
-                    <div class="action-description">View and manage user feedback</div>
+                    <h3>Feedback</h3>
+                    <p>View user feedback</p>
                 </div>
             </div>
         </div>
@@ -639,44 +842,18 @@
             <div class="chart-card">
                 <div class="chart-header">
                     <h2 class="chart-title">
-                        <i class="fas fa-chart-bar"></i>
-                        Sit-in Activity
+                        <i class="fas fa-chart-pie"></i>
+                        Sit-in Activity by Purpose
                     </h2>
                 </div>
-                <!-- Add chart here later -->
-                <div style="width: 100%; height: 300px; background: #f8fafc; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; color: #64748b;">
-                    Activity Chart Coming Soon
+                <div class="chart-container" style="position: relative; height: 300px;">
+                    <canvas id="purposeChart"></canvas>
                 </div>
-            </div>
-
-            <div class="announcements">
-                <div class="chart-header">
-                    <h2 class="chart-title">
-                        <i class="fas fa-bullhorn"></i>
-                        Announcements
-                    </h2>
-                    <a href="{{ url_for('admin_announcements') }}" class="btn btn-primary">
-                        <i class="fas fa-plus"></i>
-                        Create
-                    </a>
-                </div>
-                {% for announcement in announcements %}
-                <div class="announcement-item">
-                    <div class="announcement-title">
-                        <h3>{{ announcement.title }}</h3>
-                        <span class="badge">{{ announcement.type }}</span>
-                    </div>
-                    <p class="announcement-content">{{ announcement.content }}</p>
-                    <div class="announcement-time">
-                        <i class="far fa-clock"></i>
-                        {{ announcement.timestamp }}
-                    </div>
-                </div>
-                {% endfor %}
             </div>
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Mobile menu toggle
         const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
@@ -712,148 +889,67 @@
             });
         }, 5000);
 
-        // Loading overlay functions
-        function showLoading() {
-            document.querySelector('.loading-overlay').style.display = 'flex';
-        }
-
-        function hideLoading() {
-            document.querySelector('.loading-overlay').style.display = 'none';
-        }
-
-        // Function to show flash message programmatically
-        function showFlash(message, category = 'info') {
-            const flashMessages = document.querySelector('.flash-messages');
-            const flashMessage = document.createElement('div');
-            flashMessage.className = `flash-message ${category}`;
-            flashMessage.innerHTML = `
-                <span>${message}</span>
-                <button class="flash-close">&times;</button>
-            `;
-            
-            flashMessages.appendChild(flashMessage);
-            
-            const closeButton = flashMessage.querySelector('.flash-close');
-            closeButton.addEventListener('click', function() {
-                flashMessage.style.animation = 'slideOut 0.3s ease forwards';
-                setTimeout(() => flashMessage.remove(), 300);
-            });
-
-            setTimeout(() => {
-                flashMessage.style.animation = 'slideOut 0.3s ease forwards';
-                setTimeout(() => flashMessage.remove(), 300);
-            }, 5000);
-        }
-
-        // Add error handling for action cards
-        document.querySelectorAll('.action-card').forEach(card => {
-            card.addEventListener('click', async function() {
-                try {
-                    const title = this.querySelector('.action-title').textContent;
-                    showLoading();
-                    
-                    // Simulate API call (replace with actual API calls later)
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    switch(title) {
-                        case 'Users':
-                            showFlash('Loading user management...', 'info');
-                            // Add user management logic
-                            break;
-                        case 'Lab Resources':
-                            showFlash('Loading laboratory resources...', 'info');
-                            // Add lab resources logic
-                            break;
-                        case 'Reservations':
-                            showFlash('Loading reservation management...', 'info');
-                            // Add reservations logic
-                            break;
-                        case 'Active Sessions':
-                            showFlash('Loading active sessions...', 'info');
-                            // Add active sessions logic
-                            break;
-                        case 'Session History':
-                            showFlash('Loading session history...', 'info');
-                            // Add session history logic
-                            break;
-                        case 'Reports':
-                            showFlash('Generating reports...', 'info');
-                            // Add reports logic
-                            break;
-                        case 'Announcements':
-                            showFlash('Loading announcement management...', 'info');
-                            // Add announcements logic
-                            break;
-                        default:
-                            showFlash('Feature coming soon!', 'warning');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    showFlash('An error occurred. Please try again.', 'error');
-                } finally {
-                    hideLoading();
+        // Simple action card click handling
+        document.querySelectorAll('.action-card[data-url]').forEach(card => {
+            card.addEventListener('click', function() {
+                const url = this.getAttribute('data-url');
+                if (url) {
+                    window.location.href = url;
                 }
             });
         });
 
-        // Error handling for chart loading
-        window.addEventListener('load', async () => {
-            try {
-                // Simulate chart loading
-                showLoading();
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                // Add actual chart loading logic here
-            } catch (error) {
-                console.error('Error loading chart:', error);
-                showFlash('Failed to load activity chart', 'error');
-            } finally {
-                hideLoading();
+        // Purpose Chart
+        const purposeData = {
+            labels: JSON.parse('{{ purpose_data.labels|tojson|safe }}'),
+            datasets: [{
+                data: JSON.parse('{{ purpose_data.data|tojson|safe }}'),
+                backgroundColor: [
+                    '#3b82f6',
+                    '#10b981',
+                    '#f59e0b',
+                    '#ef4444',
+                    '#6b7280',
+                    '#8b5cf6',
+                    '#ec4899',
+                    '#14b8a6',
+                    '#f97316',
+                    '#84cc16'
+                ],
+                borderWidth: 1
+            }]
+        };
+
+        const purposeConfig = {
+            type: 'pie',
+            data: purposeData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 15
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${percentage}% (${value} sessions)`;
+                            }
+                        }
+                    }
+                }
             }
-        });
+        };
 
-        // Error handling for announcements
-        document.querySelector('.btn-primary').addEventListener('click', async () => {
-            try {
-                showLoading();
-                // Simulate announcement creation
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                showFlash('Create announcement feature coming soon!', 'info');
-            } catch (error) {
-                console.error('Error:', error);
-                showFlash('Failed to create announcement', 'error');
-            } finally {
-                hideLoading();
-            }
-        });
-
-        // Handle network errors
-        window.addEventListener('offline', () => {
-            showFlash('You are offline. Some features may not work.', 'warning');
-        });
-
-        window.addEventListener('online', () => {
-            showFlash('You are back online!', 'success');
-        });
-
-        // Handle session timeout
-        let sessionTimeout;
-        function resetSessionTimeout() {
-            clearTimeout(sessionTimeout);
-            sessionTimeout = setTimeout(() => {
-                showFlash('Your session will expire soon. Please refresh the page.', 'warning');
-            }, 25 * 60 * 1000); // 25 minutes
-        }
-
-        document.addEventListener('click', resetSessionTimeout);
-        document.addEventListener('keypress', resetSessionTimeout);
-        resetSessionTimeout();
-
-        // Add this to the existing JavaScript section
-        document.querySelectorAll('.action-card[data-href]').forEach(card => {
-            card.addEventListener('click', function() {
-                window.location.href = this.dataset.href;
-            });
-        });
+        new Chart(document.getElementById('purposeChart'), purposeConfig);
     </script>
 </body>
 </html> 

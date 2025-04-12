@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Resources</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8fafc;
+        }
+        .navbar {
+            background: #1e40af;
+            padding: 1rem 2rem;
+        }
+        .nav-brand {
+            color: white;
+            text-decoration: none;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        .nav-brand i {
+            margin-right: 0.5rem;
+        }
+        .resource-card {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            height: 100%;
+        }
+        .resource-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .resource-icon {
+            width: 48px;
+            height: 48px;
+            background: #1e40af;
+            color: white;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .resource-link {
+            color: #1e40af;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .resource-link:hover {
+            text-decoration: underline;
+        }
+        .resource-description {
+            color: #64748b;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container-fluid">
+            <a href="{{ url_for('home') }}" class="nav-brand">
+                <i class="fas fa-arrow-left"></i>
+                Back to Home
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col">
+                <h2>Available Lab Resources</h2>
+                <p class="text-muted">Access laboratory computers, equipment, and learning materials.</p>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            {% for resource in resources %}
+            <div class="col-md-6 col-lg-4">
+                <div class="resource-card p-4">
+                    <div class="resource-icon">
+                        <i class="fas fa-desktop"></i>
+                    </div>
+                    <h5 class="mb-2">{{ resource.name }}</h5>
+                    <p class="resource-description">{{ resource.description }}</p>
+                    {% if resource.link != '-' %}
+                    <a href="{{ resource.link }}" target="_blank" class="resource-link">
+                        <i class="fas fa-external-link-alt"></i>
+                        Access Resource
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas fa-desktop fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No resources are currently available.</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

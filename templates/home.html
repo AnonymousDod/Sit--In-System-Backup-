@@ -76,6 +76,23 @@
             object-fit: cover;
         }
 
+        .user-details {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .user-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .remaining-sessions {
+            font-size: 0.85rem;
+            color: #667eea;
+            font-weight: 500;
+        }
+
         .container {
             max-width: 1200px;
             margin: 2rem auto;
@@ -497,6 +514,7 @@
             </div>
             <div class="user-details">
                 <span class="user-name">{{ user.first_name if user else '' }} {{ user.last_name if user else '' }}</span>
+                <span class="remaining-sessions">Sessions left: {{ user.remaining_sessions if user else '0' }}</span>
             </div>
             <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
         </div>
@@ -558,12 +576,12 @@
                 <p>View laboratory rules and regulations</p>
             </a>
 
-            <a href="#" class="card" id="labResources">
+            <a href="{{ url_for('user_resources') }}" class="card" style="text-decoration: none;">
                 <div class="card-icon">
                     <i class="fas fa-desktop"></i>
                 </div>
                 <h3>Lab Resources</h3>
-                <p>View available laboratory resources</p>
+                <p>Access laboratory computers, equipment, and learning materials</p>
             </a>
 
             <a href="#" class="card" id="history">
@@ -726,7 +744,7 @@
                         <i class="bi bi-calendar-plus me-2"></i>
                         Make a Reservation
                     </h3>
-                    <form id="reservationForm" class="reservation-form">
+                    <form id="reservationForm" class="reservation-form" action="{{ url_for('submit_reservation') }}" method="POST">
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="reservationDate">Date</label>
@@ -739,6 +757,13 @@
                                        class="form-control" min="07:00" max="21:00"
                                        onchange="validateTime()">
                                 <small class="form-text text-muted">Laboratory hours: 7:00 AM - 9:00 PM</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="reservationType">Reservation Type</label>
+                                <select id="reservationType" name="reservation_type" required class="form-control">
+                                    <option value="regular">Regular Reservation</option>
+                                    <option value="sit_in">Sit-in</option>
+                                </select>
                             </div>
                         </div>
                         <div class="form-group">
@@ -869,9 +894,8 @@
                         return;
                     }
                     
-                    // If all validations pass, show success message
-                    alert('Reservation submitted successfully!');
-                    closeReservationModal();
+                    // Submit the form
+                    this.submit();
                 });
             }
 
