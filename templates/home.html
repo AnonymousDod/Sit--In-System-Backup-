@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CICS Laboratory System - Student Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: rgb(255, 255, 255);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-logo img {
+            height: 50px;
+        }
+
+        .header-title {
+            color: #333;
+        }
+
+        .header-title h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .header-title h2 {
+            font-size: 1rem;
+            color: #666;
+            font-weight: normal;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #667eea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            overflow: hidden;
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1rem;
+            background: #f0f4ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-icon i {
+            font-size: 24px;
+            color: #667eea;
+        }
+
+        .card h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .card p {
+            color: #666;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .welcome-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .welcome-section h1 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .welcome-section p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .logout-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .logout-btn:hover {
+            background: #764ba2;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                text-align: center;
+                padding: 1rem;
+            }
+
+            .header-logo {
+                margin-bottom: 1rem;
+            }
+
+            .user-info {
+                flex-direction: column;
+            }
+
+            .grid-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .content-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 1.5rem;
+        }
+
+        .mb-3 {
+            margin-bottom: 1rem;
+        }
+
+        .mb-5 {
+            margin-bottom: 2rem;
+        }
+
+        .me-2 {
+            margin-right: 0.5rem;
+        }
+
+        .text-primary {
+            color: #667eea;
+        }
+
+        .text-danger {
+            color: #dc3545;
+        }
+
+        .welcome-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .list-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .list-group-item {
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+
+        .list-group-item i {
+            display: inline-block;
+            width: 20px;
+        }
+
+        .rules-body {
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        #rulesSection {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: white;
+            margin: 2rem auto;
+            padding: 2rem;
+            max-width: 900px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .close-button:hover {
+            color: #333;
+        }
+
+        .reservation-form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 1rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .submit-btn:hover {
+            background: #764ba2;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-text {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .reservation-period {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+            border: 1px solid #dee2e6;
+        }
+
+        .reservation-period span {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+            display: none;
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        .flash-message {
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 0.5rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .success {
+            background: #10b981;
+            color: white;
+        }
+
+        .error {
+            background: #ef4444;
+            color: white;
+        }
+
+        .warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .info {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .rating-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 0.75rem;
+        }
+
+        .stars {
+            display: flex;
+            gap: 1rem;
+            font-size: 2rem;
+        }
+
+        .star {
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0.5rem;
+        }
+
+        .star:hover {
+            transform: scale(1.2);
+            color: #fbbf24;
+        }
+
+        .star.active {
+            color: #fbbf24;
+            transform: scale(1.1);
+        }
+
+        .rating-text {
+            font-size: 1.1rem;
+            color: #64748b;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .bg-urgent {
+            background-color: #fff5f5;
+        }
+        
+        .bg-important {
+            background-color: #fff8e1;
+        }
+        
+        .bg-normal {
+            background-color: #f8f9fa;
+        }
+    </style>
+    <!-- Add Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Add Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="header-logo">
+            <img src="{{ url_for('static', filename='uploads/uclogo.jpg') }}" alt="UC Logo" id="ucLogo">
+            <img src="{{ url_for('static', filename='uploads/ccs.png') }}" alt="ccsLogo" id="ccsLogo>
+            <div class="header-title">
+                <h1>Sit-In Monitoring System</h1>
+            </div>
+        </div>
+        <div class="user-info">
+            <div class="user-avatar">
+                {% if user and user.profile_image %}
+                    <img src="{{ url_for('static', filename='uploads/' + user.profile_image) }}" 
+                         alt="Profile Image"
+                         id="profileImage">
+                {% else %}
+                    <span class="avatar-text">{{ user.first_name[0].upper() if user and user.first_name else 'U' }}</span>
+                {% endif %}
+            </div>
+            <div class="user-details">
+                <span class="user-name">{{ user.first_name if user else '' }} {{ user.last_name if user else '' }}</span>
+            </div>
+            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Announcements Section -->
+        {% if announcements %}
+        <div class="announcements-section mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-bullhorn me-2"></i>Announcements</h3>
+                </div>
+                <div class="card-body">
+                    {% for announcement in announcements %}
+                    <div class="announcement-item mb-3 p-3 border rounded {% if announcement.type == 'Urgent' %}bg-urgent{% elif announcement.type == 'Important' %}bg-important{% else %}bg-normal{% endif %}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h4 class="mb-0">{{ announcement.title }}</h4>
+                            <span class="badge bg-{{ 'danger' if announcement.type == 'Urgent' else 'warning' if announcement.type == 'Important' else 'primary' }}">
+                                {{ announcement.type }}
+                            </span>
+                        </div>
+                        <p class="mb-2">{{ announcement.content }}</p>
+                        <small class="text-muted">
+                            <i class="far fa-clock me-1"></i>
+                            {{ announcement.created_at.strftime('%b %d, %Y %I:%M %p') }}
+                        </small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="grid-container">
+            <a href="#" class="card" id="makeReservation">
+                <div class="card-icon">
+                    <i class="fas fa-calendar-plus"></i>
+                </div>
+                <h3>Make Reservation</h3>
+                <p>Reserve a sit-in session for laboratory activities</p>
+            </a>
+
+            <a href="#" class="card" id="labRules">
+                <div class="card-icon">
+                    <i class="fas fa-book"></i>
+                </div>
+                <h3>Laboratory Rules</h3>
+                <p>View laboratory rules and regulations</p>
+            </a>
+
+            <a href="#" class="card" id="labResources">
+                <div class="card-icon">
+                    <i class="fas fa-desktop"></i>
+                </div>
+                <h3>Lab Resources</h3>
+                <p>View available laboratory resources</p>
+            </a>
+
+            <a href="#" class="card" id="history">
+                <div class="card-icon">
+                    <i class="fas fa-history"></i>
+                </div>
+                <h3>History</h3>
+                <p>View your past laboratory activities</p>
+            </a>
+
+            <a href="#" class="card" id="feedback">
+                <div class="card-icon">
+                    <i class="fas fa-comment"></i>
+                </div>
+                <h3>Give Feedback</h3>
+                <p>Share your experience with us</p>
+            </a>
+
+            <a href="{{ url_for('profile') }}" class="card">
+                <div class="card-icon">
+                    <i class="fas fa-user-edit"></i>
+                </div>
+                <h3>Edit Profile</h3>
+                <p>Update your personal information</p>
+            </a>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rulesModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="close-button" onclick="closeRulesModal()">&times;</button>
+            <div id="rulesSection">
+                <div id="rules" class="mb-5">
+                    <div class="welcome-card">
+                        <h3 class="mb-4"><i class="bi bi-list-check me-2"></i>Laboratory Rules</h3>
+                        <div class="rules-body">
+                            <p class="mb-4">To avoid embarrassment and maintain camaraderie with your friends and superiors at our laboratories, please observe the following:</p>
+        
+                            <!-- General Rules -->
+                            <div class="mb-4">
+                                <h5 class="text-primary mb-3"><i class="bi bi-list-check me-2"></i>General Rules</h5>
+                                <div class="list-group">
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Maintain silence, proper decorum, and discipline inside the laboratory. Mobile phones, walkmans, and other personal pieces of equipment must be switched off.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Games are not allowed inside the lab. This includes computer-related games, card games, and other games that may disturb the operation of the lab.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Surfing the Internet is allowed only with the permission of the instructor. Downloading and installing of software are strictly prohibited.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Getting access to other websites not related to the course (especially pornographic and illicit sites) is strictly prohibited.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Deleting computer files and changing the set-up of the computer is a major offense.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Observe computer time usage carefully. A fifteen-minute allowance is given for each use. Otherwise, the unit will be given to those who wish to "sit-in".
+                                    </div>
+                                </div>
+                            </div>
+        
+                            <!-- Laboratory Decorum -->
+                            <div class="mb-4">
+                                <h5 class="text-primary mb-3"><i class="bi bi-person-check me-2"></i>Laboratory Decorum</h5>
+                                <div class="list-group">
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Do not get inside the lab unless the instructor is present.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        All bags, knapsacks, and the like must be deposited at the counter.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Follow the seating arrangement of your instructor.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        At the end of class, all software programs must be closed.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Return all chairs to their proper places after using.
+                                    </div>
+                                </div>
+                            </div>
+        
+                            <!-- Prohibited Activities -->
+                            <div class="mb-4">
+                                <h5 class="text-primary mb-3"><i class="bi bi-x-circle me-2"></i>Prohibited Activities</h5>
+                                <div class="list-group">
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Chewing gum, eating, drinking, smoking, and other forms of vandalism are prohibited inside the lab.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Anyone causing a continual disturbance will be asked to leave the lab. Acts or gestures offensive to the members of the community, including public display of physical intimacy, are not tolerated.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Persons exhibiting hostile or threatening behavior such as yelling, swearing, or disregarding requests made by lab personnel will be asked to leave the lab.
+                                    </div>
+                                </div>
+                            </div>
+        
+                            <!-- Technical Issues -->
+                            <div class="mb-4">
+                                <h5 class="text-primary mb-3"><i class="bi bi-tools me-2"></i>Technical Issues</h5>
+                                <div class="list-group">
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        For serious offenses, the lab personnel may call the Civil Security Office (CSU) for assistance.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-circle text-primary me-2"></i>
+                                        Any technical problem or difficulty must be addressed to the laboratory supervisor, student assistant, or instructor immediately.
+                                    </div>
+                                </div>
+                            </div>
+        
+                            <!-- Disciplinary Actions -->
+                            <div class="mb-4">
+                                <h5 class="text-danger mb-3"><i class="bi bi-shield-exclamation me-2"></i>Disciplinary Actions</h5>
+                                <div class="list-group">
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+                                        <strong>First Offense</strong> - The Head or the Dean or OIC recommends to the Guidance Center for a suspension from classes for each offender.
+                                    </div>
+                                    <div class="list-group-item">
+                                        <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+                                        <strong>Second and Subsequent Offenses</strong> - A recommendation for a heavier sanction will be endorsed to the Guidance Center.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reservation Modal -->
+    <div id="reservationModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="close-button" onclick="closeReservationModal()">&times;</button>
+            <div id="reservationSection">
+                <div class="welcome-card">
+                    <h3 class="mb-4">
+                        <i class="bi bi-calendar-plus me-2"></i>
+                        Make a Reservation
+                    </h3>
+                    <form id="reservationForm" class="reservation-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="reservationDate">Date</label>
+                                <input type="date" id="reservationDate" name="date" required 
+                                       min="{{ today_date }}" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="reservationTime">Time</label>
+                                <input type="time" id="reservationTime" name="time" required 
+                                       class="form-control" min="07:00" max="21:00"
+                                       onchange="validateTime()">
+                                <small class="form-text text-muted">Laboratory hours: 7:00 AM - 9:00 PM</small>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="reservationPurpose">Purpose</label>
+                            <select id="reservationPurpose" name="purpose" required class="form-control">
+                                <option value="">Select a purpose</option>
+                                <option value="assignment">Assignment</option>
+                                <option value="project">Project</option>
+                                <option value="research">Research</option>
+                                <option value="practice">Practice</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="laboratoryUnit">Laboratory Unit</label>
+                            <select id="laboratoryUnit" name="laboratory_unit" required class="form-control">
+                                <option value="">Select a laboratory unit</option>
+                                <option value="lab1">Laboratory 1</option>
+                                <option value="lab2">Laboratory 2</option>
+                                <option value="lab3">Laboratory 3</option>
+                                <option value="lab4">Laboratory 4</option>
+                                <option value="lab5">Laboratory 5</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="submit-btn">
+                            <i class="bi bi-check-circle me-2"></i>
+                            Submit Reservation
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div id="feedbackModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="close-button" onclick="closeFeedbackModal()">&times;</button>
+            <div id="feedbackSection">
+                <div class="welcome-card">
+                    <h3 class="mb-4">
+                        <i class="bi bi-chat-dots me-2"></i>
+                        Give Feedback
+                    </h3>
+                    <form id="feedbackForm" class="reservation-form" action="{{ url_for('submit_feedback') }}" method="POST">
+                        <div class="rating-container">
+                            <label>How was your experience?</label>
+                            <div class="stars">
+                                <span class="star" data-value="1"><i class="fas fa-star"></i></span>
+                                <span class="star" data-value="2"><i class="fas fa-star"></i></span>
+                                <span class="star" data-value="3"><i class="fas fa-star"></i></span>
+                                <span class="star" data-value="4"><i class="fas fa-star"></i></span>
+                                <span class="star" data-value="5"><i class="fas fa-star"></i></span>
+                            </div>
+                            <span class="rating-text">Select your rating</span>
+                            <input type="hidden" name="rating" id="ratingInput" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="feedbackText">Share your thoughts</label>
+                            <textarea id="feedbackText" name="feedback_text" required class="form-control" 
+                                    rows="5" placeholder="Tell us about your experience..."></textarea>
+                            <small class="form-text text-muted">Your feedback helps us improve our services.</small>
+                        </div>
+
+                        <button type="submit" class="submit-btn">
+                            <i class="bi bi-send me-2"></i>
+                            Submit Feedback
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle card clicks
+            const cardActions = {
+                'makeReservation': function() { openReservationModal(); },
+                'labRules': function() { openRulesModal(); },
+                'labResources': function() { alert('Lab resources feature coming soon!'); },
+                'history': function() { alert('History feature coming soon!'); },
+                'feedback': function() { openFeedbackModal(); }
+            };
+
+            // Add click handlers to each card
+            Object.keys(cardActions).forEach(function(id) {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        cardActions[id]();
+                    });
+                }
+            });
+
+            // Handle image loading errors
+            const ucLogo = document.getElementById('ucLogo');
+            if (ucLogo) {
+                ucLogo.addEventListener('error', function() {
+                    this.src = "{{ url_for('static', filename='img/default-logo.png') }}";
+                });
+            }
+
+            const profileImage = document.getElementById('profileImage');
+            if (profileImage) {
+                profileImage.addEventListener('error', function() {
+                    const userInitial = "{{ user.first_name[0].upper() if user and user.first_name else 'U' }}";
+                    this.parentElement.innerHTML = '<span class="avatar-text">' + userInitial + '</span>';
+                });
+            }
+
+            // Handle reservation form submission
+            const reservationForm = document.getElementById('reservationForm');
+            if (reservationForm) {
+                reservationForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    // Validate time
+                    const timeInput = document.getElementById('reservationTime');
+                    if (!timeInput.value) {
+                        alert('Please select a time');
+                        return;
+                    }
+
+                    if (!validateTime()) {
+                        return;
+                    }
+                    
+                    // If all validations pass, show success message
+                    alert('Reservation submitted successfully!');
+                    closeReservationModal();
+                });
+            }
+
+            // Set minimum date to today
+            const dateInput = document.getElementById('reservationDate');
+            if (dateInput) {
+                const today = new Date().toISOString().split('T')[0];
+                dateInput.setAttribute('min', today);
+            }
+        });
+
+        function openRulesModal() {
+            document.getElementById('rulesModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeRulesModal() {
+            document.getElementById('rulesModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('rulesModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeRulesModal();
+            }
+        });
+
+        function validateTime() {
+            const timeInput = document.getElementById('reservationTime');
+            const selectedTime = timeInput.value;
+            const [hours, minutes] = selectedTime.split(':').map(Number);
+            const timeInMinutes = hours * 60 + minutes;
+            
+            // Convert 7:00 AM and 9:00 PM to minutes for comparison
+            const minTime = 7 * 60; // 7:00 AM
+            const maxTime = 21 * 60; // 9:00 PM
+            
+            if (timeInMinutes < minTime || timeInMinutes > maxTime) {
+                alert('Please select a time between 7:00 AM and 9:00 PM');
+                timeInput.value = '';
+                return false;
+            }
+            return true;
+        }
+
+        function openReservationModal() {
+            document.getElementById('reservationModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeReservationModal() {
+            document.getElementById('reservationModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('reservationModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeReservationModal();
+            }
+        });
+
+        function openFeedbackModal() {
+            document.getElementById('feedbackModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeFeedbackModal() {
+            document.getElementById('feedbackModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('feedbackModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeFeedbackModal();
+            }
+        });
+
+        // Star rating functionality
+        const stars = document.querySelectorAll('.star');
+        const ratingText = document.querySelector('.rating-text');
+        const ratingInput = document.getElementById('ratingInput');
+        const ratingTexts = {
+            1: 'Poor - Needs significant improvement',
+            2: 'Fair - Could be better',
+            3: 'Good - Met expectations',
+            4: 'Very Good - Above expectations',
+            5: 'Excellent - Outstanding experience'
+        };
+
+        stars.forEach(star => {
+            star.addEventListener('click', function() {
+                const value = this.dataset.value;
+                ratingInput.value = value;
+                updateStars(value);
+                ratingText.textContent = ratingTexts[value];
+            });
+
+            star.addEventListener('mouseover', function() {
+                const value = this.dataset.value;
+                updateStars(value);
+                ratingText.textContent = ratingTexts[value];
+            });
+        });
+
+        document.querySelector('.stars').addEventListener('mouseleave', function() {
+            const currentRating = ratingInput.value;
+            updateStars(currentRating);
+            ratingText.textContent = currentRating ? ratingTexts[currentRating] : 'Select your rating';
+        });
+
+        function updateStars(value) {
+            stars.forEach(star => {
+                star.classList.toggle('active', star.dataset.value <= value);
+            });
+        }
+
+        // Form validation
+        const feedbackForm = document.getElementById('feedbackForm');
+        if (feedbackForm) {
+            feedbackForm.addEventListener('submit', function(e) {
+                const rating = ratingInput.value;
+                const feedbackText = document.getElementById('feedbackText').value;
+
+                if (!rating || !feedbackText) {
+                    e.preventDefault();
+                    alert('Please provide both a rating and feedback text');
+                    return;
+                }
+            });
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - CICS Laboratory System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        :root {
+            --primary-color: #1e40af;
+            --secondary-color: #1d4ed8;
+            --accent-color: #3b82f6;
+            --background-color: #f1f5f9;
+            --text-color: #1e293b;
+            --text-light: #64748b;
+            --white: #ffffff;
+        }
+
+        body {
+            background: var(--background-color);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: var(--primary-color);
+            padding: 1rem 2rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--white);
+            text-decoration: none;
+        }
+
+        .nav-brand i {
+            font-size: 1.5rem;
+        }
+
+        .nav-brand h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .nav-menu {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .nav-item {
+            color: var(--white);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            font-size: 0.875rem;
+        }
+
+        .nav-item:hover {
+            background: var(--secondary-color);
+        }
+
+        .nav-item.active {
+            background: var(--secondary-color);
+        }
+
+        .nav-item i {
+            font-size: 1rem;
+        }
+
+        .logout-btn {
+            background: #ef4444;
+            color: var(--white);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            font-size: 0.875rem;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .main-content {
+            padding: 7rem 2rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .action-card {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .action-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background: var(--primary-color);
+            color: var(--white);
+        }
+
+        .action-card:hover .action-icon {
+            background: var(--white);
+            color: var(--primary-color);
+        }
+
+        .action-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.75rem;
+            background: var(--primary-color);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            transition: all 0.3s ease;
+        }
+
+        .action-info {
+            flex: 1;
+        }
+
+        .action-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .action-description {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        .action-card:hover .action-description {
+            color: var(--white);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .stat-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.75rem;
+            background: var(--primary-color);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .stat-info {
+            flex: 1;
+        }
+
+        .stat-title {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .chart-card {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .chart-title {
+            font-size: 1.125rem;
+            font-weight: bold;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .announcements {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .announcement-item {
+            padding: 1rem 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .announcement-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .announcement-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .announcement-title h3 {
+            font-size: 1rem;
+            color: var(--text-color);
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: #10b981;
+            color: var(--white);
+        }
+
+        .announcement-content {
+            color: var(--text-light);
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .announcement-time {
+            color: var(--text-light);
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary-color);
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--white);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .nav-menu {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: var(--primary-color);
+                padding: 1rem;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .nav-menu.active {
+                display: flex;
+            }
+
+            .nav-item {
+                width: 100%;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .quick-actions {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .flash-messages {
+            position: fixed;
+            top: 5rem;
+            right: 1rem;
+            z-index: 1100;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .flash-message {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease;
+        }
+
+        .flash-message.success {
+            background: #10b981;
+            color: white;
+        }
+
+        .flash-message.error {
+            background: #ef4444;
+            color: white;
+        }
+
+        .flash-message.warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .flash-message.info {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .flash-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.25rem;
+            padding: 0.25rem;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+
+        .flash-close:hover {
+            opacity: 1;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid var(--white);
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .disabled {
+            opacity: 0.7;
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-brand">
+                <i class="fas fa-shield-alt"></i>
+                <h1>Admin Dashboard</h1>
+            </a>
+            <button class="mobile-menu-btn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="nav-menu">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-item">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('logout') }}" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">
+                        <span>{{ message }}</span>
+                        <button class="flash-close">&times;</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <main class="main-content">
+        <div class="quick-actions">
+            <div class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Users</div>
+                    <div class="action-description">Manage student accounts and permissions</div>
+                </div>
+            </div>
+            <div class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-desktop"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Lab Resources</div>
+                    <div class="action-description">Manage laboratory computers and equipment</div>
+                </div>
+            </div>
+            <div class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Reservations</div>
+                    <div class="action-description">View and manage student reservations</div>
+                </div>
+            </div>
+            <div class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Active Sessions</div>
+                    <div class="action-description">Monitor current laboratory sessions</div>
+                </div>
+            </div>
+            <div class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-history"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Session History</div>
+                    <div class="action-description">View past laboratory activities</div>
+                </div>
+            </div>
+            <div class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Reports</div>
+                    <div class="action-description">Generate usage and activity reports</div>
+                </div>
+            </div>
+            <div class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-bullhorn"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Announcements</div>
+                    <div class="action-description">Manage system announcements</div>
+                </div>
+            </div>
+            <div class="action-card" data-href="{{ url_for('admin_feedback') }}">
+                <div class="action-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Feedback</div>
+                    <div class="action-description">View and manage user feedback</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-title">Students Registered</div>
+                        <div class="stat-value">{{ total_users }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">
+                        <i class="fas fa-desktop"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-title">Currently Sit-in</div>
+                        <div class="stat-value">{{ active_reservations }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-title">Total Sit-in</div>
+                        <div class="stat-value">{{ total_reservations }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2 class="chart-title">
+                        <i class="fas fa-chart-bar"></i>
+                        Sit-in Activity
+                    </h2>
+                </div>
+                <!-- Add chart here later -->
+                <div style="width: 100%; height: 300px; background: #f8fafc; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; color: #64748b;">
+                    Activity Chart Coming Soon
+                </div>
+            </div>
+
+            <div class="announcements">
+                <div class="chart-header">
+                    <h2 class="chart-title">
+                        <i class="fas fa-bullhorn"></i>
+                        Announcements
+                    </h2>
+                    <a href="{{ url_for('admin_announcements') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i>
+                        Create
+                    </a>
+                </div>
+                {% for announcement in announcements %}
+                <div class="announcement-item">
+                    <div class="announcement-title">
+                        <h3>{{ announcement.title }}</h3>
+                        <span class="badge">{{ announcement.type }}</span>
+                    </div>
+                    <p class="announcement-content">{{ announcement.content }}</p>
+                    <div class="announcement-time">
+                        <i class="far fa-clock"></i>
+                        {{ announcement.timestamp }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Mobile menu toggle
+        const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
+        const navMenu = document.querySelector('.nav-menu');
+
+        mobileMenuBtn.addEventListener('click', () => {
+            navMenu.classList.toggle('active');
+        });
+
+        // Add active class to current nav item
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            item.addEventListener('click', function() {
+                navItems.forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Flash message handling
+        document.querySelectorAll('.flash-close').forEach(button => {
+            button.addEventListener('click', function() {
+                const flashMessage = this.parentElement;
+                flashMessage.style.animation = 'slideOut 0.3s ease forwards';
+                setTimeout(() => flashMessage.remove(), 300);
+            });
+        });
+
+        // Auto-dismiss flash messages after 5 seconds
+        setTimeout(() => {
+            document.querySelectorAll('.flash-message').forEach(message => {
+                message.style.animation = 'slideOut 0.3s ease forwards';
+                setTimeout(() => message.remove(), 300);
+            });
+        }, 5000);
+
+        // Loading overlay functions
+        function showLoading() {
+            document.querySelector('.loading-overlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.querySelector('.loading-overlay').style.display = 'none';
+        }
+
+        // Function to show flash message programmatically
+        function showFlash(message, category = 'info') {
+            const flashMessages = document.querySelector('.flash-messages');
+            const flashMessage = document.createElement('div');
+            flashMessage.className = `flash-message ${category}`;
+            flashMessage.innerHTML = `
+                <span>${message}</span>
+                <button class="flash-close">&times;</button>
+            `;
+            
+            flashMessages.appendChild(flashMessage);
+            
+            const closeButton = flashMessage.querySelector('.flash-close');
+            closeButton.addEventListener('click', function() {
+                flashMessage.style.animation = 'slideOut 0.3s ease forwards';
+                setTimeout(() => flashMessage.remove(), 300);
+            });
+
+            setTimeout(() => {
+                flashMessage.style.animation = 'slideOut 0.3s ease forwards';
+                setTimeout(() => flashMessage.remove(), 300);
+            }, 5000);
+        }
+
+        // Add error handling for action cards
+        document.querySelectorAll('.action-card').forEach(card => {
+            card.addEventListener('click', async function() {
+                try {
+                    const title = this.querySelector('.action-title').textContent;
+                    showLoading();
+                    
+                    // Simulate API call (replace with actual API calls later)
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    switch(title) {
+                        case 'Users':
+                            showFlash('Loading user management...', 'info');
+                            // Add user management logic
+                            break;
+                        case 'Lab Resources':
+                            showFlash('Loading laboratory resources...', 'info');
+                            // Add lab resources logic
+                            break;
+                        case 'Reservations':
+                            showFlash('Loading reservation management...', 'info');
+                            // Add reservations logic
+                            break;
+                        case 'Active Sessions':
+                            showFlash('Loading active sessions...', 'info');
+                            // Add active sessions logic
+                            break;
+                        case 'Session History':
+                            showFlash('Loading session history...', 'info');
+                            // Add session history logic
+                            break;
+                        case 'Reports':
+                            showFlash('Generating reports...', 'info');
+                            // Add reports logic
+                            break;
+                        case 'Announcements':
+                            showFlash('Loading announcement management...', 'info');
+                            // Add announcements logic
+                            break;
+                        default:
+                            showFlash('Feature coming soon!', 'warning');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showFlash('An error occurred. Please try again.', 'error');
+                } finally {
+                    hideLoading();
+                }
+            });
+        });
+
+        // Error handling for chart loading
+        window.addEventListener('load', async () => {
+            try {
+                // Simulate chart loading
+                showLoading();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Add actual chart loading logic here
+            } catch (error) {
+                console.error('Error loading chart:', error);
+                showFlash('Failed to load activity chart', 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Error handling for announcements
+        document.querySelector('.btn-primary').addEventListener('click', async () => {
+            try {
+                showLoading();
+                // Simulate announcement creation
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                showFlash('Create announcement feature coming soon!', 'info');
+            } catch (error) {
+                console.error('Error:', error);
+                showFlash('Failed to create announcement', 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Handle network errors
+        window.addEventListener('offline', () => {
+            showFlash('You are offline. Some features may not work.', 'warning');
+        });
+
+        window.addEventListener('online', () => {
+            showFlash('You are back online!', 'success');
+        });
+
+        // Handle session timeout
+        let sessionTimeout;
+        function resetSessionTimeout() {
+            clearTimeout(sessionTimeout);
+            sessionTimeout = setTimeout(() => {
+                showFlash('Your session will expire soon. Please refresh the page.', 'warning');
+            }, 25 * 60 * 1000); // 25 minutes
+        }
+
+        document.addEventListener('click', resetSessionTimeout);
+        document.addEventListener('keypress', resetSessionTimeout);
+        resetSessionTimeout();
+
+        // Add this to the existing JavaScript section
+        document.querySelectorAll('.action-card[data-href]').forEach(card => {
+            card.addEventListener('click', function() {
+                window.location.href = this.dataset.href;
+            });
+        });
+    </script>
+</body>
+</html> 
