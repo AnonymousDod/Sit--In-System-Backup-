@@ -1247,28 +1247,44 @@ def generate_xml_report(data, title):
 @login_required
 @admin_required
 def admin_computers():
-    # Get unique laboratory units from sessions
-    laboratories = db.session.query(Session.laboratory_unit).distinct().all()
-    laboratories = [lab[0] for lab in laboratories if lab[0]]  # Filter out None values
+    # Predefined laboratory units with specific room numbers
+    laboratories = [
+        'Laboratory 524 - Programming Lab',
+        'Laboratory 526 - Networking Lab',
+        'Laboratory 528 - Hardware Lab',
+        'Laboratory 530 - Multimedia Lab',
+        'Laboratory 542 - Research Lab',
+        'Laboratory 544 - Project Lab',
+        'Laboratory 517 - Special Lab'
+    ]
     
     # Get computers for each laboratory
     computers = Computer.query.order_by(Computer.laboratory_unit, Computer.computer_number).all()
     
-    # Calculate statistics for each laboratory
-    laboratory_stats = {}
-    for lab in laboratories:
-        lab_computers = [c for c in computers if c.laboratory_unit == lab]
-        laboratory_stats[lab] = {
-            'total': len(lab_computers),
-            'vacant': len([c for c in lab_computers if c.status == 'vacant']),
-            'occupied': len([c for c in lab_computers if c.status == 'occupied']),
-            'maintenance': len([c for c in lab_computers if c.status == 'maintenance'])
-        }
+    # If no computers exist, create default computers for each laboratory
+    if not computers:
+        for lab in laboratories:
+            # Add 10 computers to each laboratory
+            for i in range(1, 11):
+                computer = Computer(
+                    computer_number=f"{lab.split()[1]}-{i:02d}",  # e.g., "524-01", "524-02", etc.
+                    laboratory_unit=lab,
+                    status='vacant'  # Default status is vacant
+                )
+                db.session.add(computer)
+        
+        try:
+            db.session.commit()
+            flash('Default computers have been added to all laboratories', 'success')
+            # Refresh the computers list after adding defaults
+            computers = Computer.query.order_by(Computer.laboratory_unit, Computer.computer_number).all()
+        except Exception as e:
+            db.session.rollback()
+            flash('Error adding default computers', 'error')
     
     return render_template('admin_computers.html', 
                          computers=computers,
-                         laboratories=laboratories,
-                         laboratory_stats=laboratory_stats)
+                         laboratories=laboratories)
 
 @app.route('/admin/computers/add', methods=['POST'])
 @login_required

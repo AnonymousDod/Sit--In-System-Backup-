@@ -51,30 +51,16 @@
             font-weight: 600;
             color: #1e40af;
         }
-        .laboratory-stats {
-            display: flex;
+        .computer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 1rem;
-        }
-        .stat-item {
-            text-align: center;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            background: #f8fafc;
-        }
-        .stat-value {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #1e40af;
-        }
-        .stat-label {
-            font-size: 0.875rem;
-            color: #64748b;
+            margin-top: 1rem;
         }
         .computer-card {
             border: 1px solid #e5e7eb;
             border-radius: 0.5rem;
             padding: 1rem;
-            margin-bottom: 1rem;
             background: white;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
@@ -92,11 +78,18 @@
         .computer-card.maintenance {
             border-left: 4px solid #f59e0b;
         }
+        .computer-number {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 0.5rem;
+        }
         .status-badge {
             padding: 0.25rem 0.75rem;
             border-radius: 9999px;
             font-size: 0.75rem;
             font-weight: 500;
+            margin-bottom: 1rem;
         }
         .status-badge.vacant {
             background: #10b981;
@@ -165,64 +158,41 @@
         <div class="laboratory-section">
             <div class="laboratory-header">
                 <h3 class="laboratory-title">{{ laboratory }}</h3>
-                <div class="laboratory-stats">
-                    <div class="stat-item">
-                        <div class="stat-value">{{ laboratory_stats[laboratory].total }}</div>
-                        <div class="stat-label">Total</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">{{ laboratory_stats[laboratory].vacant }}</div>
-                        <div class="stat-label">Vacant</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">{{ laboratory_stats[laboratory].occupied }}</div>
-                        <div class="stat-label">Occupied</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">{{ laboratory_stats[laboratory].maintenance }}</div>
-                        <div class="stat-label">Maintenance</div>
-                    </div>
-                </div>
             </div>
-            <div class="row">
+            <div class="computer-grid">
                 {% for computer in computers if computer.laboratory_unit == laboratory %}
-                <div class="col-md-4">
-                    <div class="computer-card {{ computer.status }}">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">Computer {{ computer.computer_number }}</h5>
-                            <span class="status-badge {{ computer.status }}">{{ computer.status|title }}</span>
-                        </div>
-                        <div class="d-grid gap-2">
-                            <button type="button" 
-                                    class="btn btn-sm btn-success status-btn {{ 'active' if computer.status == 'vacant' }}" 
-                                    onclick="updateStatus({{ computer.id }}, 'vacant')">
-                                <i class="fas fa-check"></i> Vacant
-                            </button>
-                            <button type="button" 
-                                    class="btn btn-sm btn-danger status-btn {{ 'active' if computer.status == 'occupied' }}" 
-                                    onclick="updateStatus({{ computer.id }}, 'occupied')">
-                                <i class="fas fa-user"></i> Occupied
-                            </button>
-                            <button type="button" 
-                                    class="btn btn-sm btn-warning status-btn {{ 'active' if computer.status == 'maintenance' }}" 
-                                    onclick="updateStatus({{ computer.id }}, 'maintenance')">
-                                <i class="fas fa-tools"></i> Maintenance
-                            </button>
-                            <button type="button" 
-                                    class="btn btn-sm btn-outline-danger status-btn" 
-                                    onclick="deleteComputer({{ computer.id }})">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
+                <div class="computer-card {{ computer.status }}">
+                    <div class="computer-number">PC {{ computer.computer_number }}</div>
+                    <span class="status-badge {{ computer.status }}">{{ computer.status|title }}</span>
+                    <div class="d-grid gap-2">
+                        <button type="button" 
+                                class="btn btn-sm btn-success status-btn {{ 'active' if computer.status == 'vacant' }}" 
+                                onclick="updateStatus('{{ computer.id }}', 'vacant')"
+                                title="Set as Vacant">
+                            <i class="fas fa-check"></i> Vacant
+                        </button>
+                        <button type="button" 
+                                class="btn btn-sm btn-danger status-btn {{ 'active' if computer.status == 'occupied' }}" 
+                                onclick="updateStatus('{{ computer.id }}', 'occupied')"
+                                title="Set as Occupied">
+                            <i class="fas fa-user"></i> Occupied
+                        </button>
+                        <button type="button" 
+                                class="btn btn-sm btn-warning status-btn {{ 'active' if computer.status == 'maintenance' }}" 
+                                onclick="updateStatus('{{ computer.id }}', 'maintenance')"
+                                title="Set as Maintenance">
+                            <i class="fas fa-tools"></i> Maintenance
+                        </button>
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-danger status-btn" 
+                                onclick="deleteComputer('{{ computer.id }}')"
+                                title="Delete Computer">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
                     </div>
                 </div>
                 {% endfor %}
             </div>
-        </div>
-        {% else %}
-        <div class="text-center py-4">
-            <i class="fas fa-desktop fa-3x text-muted mb-3"></i>
-            <p class="text-muted">No computers added yet</p>
         </div>
         {% endfor %}
     </div>
@@ -263,7 +233,8 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function updateStatus(computerId, status) {
-            if (confirm('Are you sure you want to update the computer status?')) {
+            const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+            if (confirm(`Are you sure you want to set this computer as ${statusText}?`)) {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = `/admin/computers/${computerId}/update-status`;
