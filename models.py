@@ -120,4 +120,25 @@ class Reservation(db.Model):
             'laboratory_unit': self.laboratory_unit,
             'status': self.status,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
+        }
+
+class Computer(db.Model):
+    __tablename__ = 'computers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    computer_number = db.Column(db.String(20), unique=True, nullable=False)
+    status = db.Column(db.String(20), default='vacant')  # vacant, occupied, maintenance
+    laboratory_unit = db.Column(db.String(100), nullable=False)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<Computer {self.computer_number}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'computer_number': self.computer_number,
+            'status': self.status,
+            'laboratory_unit': self.laboratory_unit,
+            'last_updated': self.last_updated.strftime('%Y-%m-%d %H:%M:%S')
         } 

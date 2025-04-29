@@ -1,11 +1,18 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 import os
 from werkzeug.utils import secure_filename
-from models import db, User, Feedback, Announcement, Reservation, Session
+from models import db, User, Feedback, Announcement, Reservation, Session, Computer
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from functools import wraps
+import csv
+import xml.etree.ElementTree as ET
+from io import StringIO, BytesIO
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
 def login_required(f):
     @wraps(f)
@@ -978,6 +985,358 @@ def reset_user_sessions(user_id):
             'success': False,
             'message': f'Error resetting sessions: {str(e)}'
         }), 500
+
+@app.route('/admin/reports')
+def admin_reports():
+    if 'user_id' not in session:
+        return redirect(url_for('index'))
+    
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    if not user or not user.is_admin:
+        flash('Unauthorized access', 'error')
+        return redirect(url_for('home'))
+    
+    return render_template('admin_reports.html')
+
+@app.route('/admin/export/<report_type>/<format_type>', methods=['POST'])
+@login_required
+@admin_required
+def export_report(report_type, format_type):
+    if 'user_id' not in session:
+        return redirect(url_for('index'))
+    
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    if not user or not user.is_admin:
+        flash('Unauthorized access', 'error')
+        return redirect(url_for('home'))
+    
+    start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d')
+    end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d')
+    
+    # Get data based on report type
+    if report_type == 'user_activity':
+        data = get_user_activity_data(start_date, end_date)
+        title = "User Activity Report"
+    elif report_type == 'lab_usage':
+        data = get_lab_usage_data(start_date, end_date)
+        title = "Laboratory Usage Report"
+    elif report_type == 'statistics':
+        data = get_statistics_data(start_date, end_date)
+        title = "Statistics Report"
+    else:
+        flash('Invalid report type', 'error')
+        return redirect(url_for('admin_reports'))
+    
+    # Generate report in requested format
+    if format_type == 'pdf':
+        return generate_pdf_report(data, title)
+    elif format_type == 'csv':
+        return generate_csv_report(data, title)
+    elif format_type == 'xml':
+        return generate_xml_report(data, title)
+    else:
+        flash('Invalid format type', 'error')
+        return redirect(url_for('admin_reports'))
+
+def get_user_activity_data(start_date, end_date):
+    # Get user activity data from database
+    sessions = Session.query.filter(
+        Session.start_time >= start_date,
+        Session.end_time <= end_date
+    ).all()
+    
+    data = []
+    for session in sessions:
+        data.append({
+            'user_id': session.user.id_number,
+            'name': f"{session.user.first_name} {session.user.last_name}",
+            'purpose': session.purpose,
+            'start_time': session.start_time.strftime('%Y-%m-%d %H:%M'),
+            'end_time': session.end_time.strftime('%Y-%m-%d %H:%M') if session.end_time else 'Ongoing',
+            'status': session.status
+        })
+    return data
+
+def get_lab_usage_data(start_date, end_date):
+    # Get laboratory usage data from database
+    sessions = Session.query.filter(
+        Session.start_time >= start_date,
+        Session.end_time <= end_date
+    ).all()
+    
+    data = []
+    for session in sessions:
+        data.append({
+            'laboratory_unit': session.laboratory_unit,
+            'purpose': session.purpose,
+            'start_time': session.start_time.strftime('%Y-%m-%d %H:%M'),
+            'end_time': session.end_time.strftime('%Y-%m-%d %H:%M') if session.end_time else 'Ongoing',
+            'status': session.status,
+            'user': f"{session.user.first_name} {session.user.last_name}"
+        })
+    return data
+
+def get_statistics_data(start_date, end_date):
+    # Get statistics data from database
+    total_sessions = Session.query.filter(
+        Session.start_time >= start_date,
+        Session.end_time <= end_date
+    ).count()
+    
+    active_sessions = Session.query.filter(
+        Session.start_time >= start_date,
+        Session.end_time <= end_date,
+        Session.status == 'active'
+    ).count()
+    
+    completed_sessions = Session.query.filter(
+        Session.start_time >= start_date,
+        Session.end_time <= end_date,
+        Session.status == 'completed'
+    ).count()
+    
+    purpose_stats = db.session.query(
+        Session.purpose,
+        db.func.count(Session.id).label('count')
+    ).filter(
+        Session.start_time >= start_date,
+        Session.end_time <= end_date
+    ).group_by(Session.purpose).all()
+    
+    data = {
+        'total_sessions': total_sessions,
+        'active_sessions': active_sessions,
+        'completed_sessions': completed_sessions,
+        'purpose_stats': [(purpose, count) for purpose, count in purpose_stats]
+    }
+    return data
+
+def generate_pdf_report(data, title):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    # Add title
+    elements.append(Paragraph(title, styles['Title']))
+    elements.append(Spacer(1, 12))
+    
+    # Create table data
+    if isinstance(data, list):
+        # For user activity and lab usage reports
+        table_data = [list(data[0].keys())]  # Headers
+        for row in data:
+            table_data.append(list(row.values()))
+    else:
+        # For statistics report
+        table_data = [
+            ['Metric', 'Value'],
+            ['Total Sessions', str(data['total_sessions'])],
+            ['Active Sessions', str(data['active_sessions'])],
+            ['Completed Sessions', str(data['completed_sessions'])]
+        ]
+        elements.append(Paragraph('Purpose Statistics', styles['Heading2']))
+        elements.append(Spacer(1, 12))
+        purpose_data = [['Purpose', 'Count']] + data['purpose_stats']
+        purpose_table = Table(purpose_data)
+        purpose_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(purpose_table)
+        elements.append(Spacer(1, 20))
+    
+    # Create main table
+    table = Table(table_data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(table)
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"{title.lower().replace(' ', '_')}.pdf",
+        mimetype='application/pdf'
+    )
+
+def generate_csv_report(data, title):
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    if isinstance(data, list):
+        # For user activity and lab usage reports
+        writer.writerow(data[0].keys())  # Headers
+        for row in data:
+            writer.writerow(row.values())
+    else:
+        # For statistics report
+        writer.writerow(['Metric', 'Value'])
+        writer.writerow(['Total Sessions', data['total_sessions']])
+        writer.writerow(['Active Sessions', data['active_sessions']])
+        writer.writerow(['Completed Sessions', data['completed_sessions']])
+    
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=f"{title.lower().replace(' ', '_')}.csv",
+        mimetype='text/csv'
+    )
+
+def generate_xml_report(data, title):
+    root = ET.Element('report')
+    root.set('title', title)
+    
+    if isinstance(data, list):
+        # For user activity and lab usage reports
+        for item in data:
+            record = ET.SubElement(root, 'record')
+            for key, value in item.items():
+                field = ET.SubElement(record, key)
+                field.text = str(value)
+    else:
+        # For statistics report
+        stats = ET.SubElement(root, 'statistics')
+        ET.SubElement(stats, 'total_sessions').text = str(data['total_sessions'])
+        ET.SubElement(stats, 'active_sessions').text = str(data['active_sessions'])
+        ET.SubElement(stats, 'completed_sessions').text = str(data['completed_sessions'])
+        
+        purposes = ET.SubElement(root, 'purposes')
+        for purpose, count in data['purpose_stats']:
+            purpose_elem = ET.SubElement(purposes, 'purpose')
+            ET.SubElement(purpose_elem, 'name').text = purpose
+            ET.SubElement(purpose_elem, 'count').text = str(count)
+    
+    tree = ET.ElementTree(root)
+    output = StringIO()
+    tree.write(output, encoding='unicode', xml_declaration=True)
+    output.seek(0)
+    
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=f"{title.lower().replace(' ', '_')}.xml",
+        mimetype='application/xml'
+    )
+
+@app.route('/admin/computers')
+@login_required
+@admin_required
+def admin_computers():
+    # Get unique laboratory units from sessions
+    laboratories = db.session.query(Session.laboratory_unit).distinct().all()
+    laboratories = [lab[0] for lab in laboratories if lab[0]]  # Filter out None values
+    
+    # Get computers for each laboratory
+    computers = Computer.query.order_by(Computer.laboratory_unit, Computer.computer_number).all()
+    
+    # Calculate statistics for each laboratory
+    laboratory_stats = {}
+    for lab in laboratories:
+        lab_computers = [c for c in computers if c.laboratory_unit == lab]
+        laboratory_stats[lab] = {
+            'total': len(lab_computers),
+            'vacant': len([c for c in lab_computers if c.status == 'vacant']),
+            'occupied': len([c for c in lab_computers if c.status == 'occupied']),
+            'maintenance': len([c for c in lab_computers if c.status == 'maintenance'])
+        }
+    
+    return render_template('admin_computers.html', 
+                         computers=computers,
+                         laboratories=laboratories,
+                         laboratory_stats=laboratory_stats)
+
+@app.route('/admin/computers/add', methods=['POST'])
+@login_required
+@admin_required
+def add_computer():
+    computer_number = request.form.get('computer_number')
+    laboratory_unit = request.form.get('laboratory_unit')
+    
+    if not computer_number or not laboratory_unit:
+        flash('Computer number and laboratory unit are required', 'error')
+        return redirect(url_for('admin_computers'))
+    
+    # Check if computer number already exists
+    if Computer.query.filter_by(computer_number=computer_number).first():
+        flash('Computer number already exists', 'error')
+        return redirect(url_for('admin_computers'))
+    
+    computer = Computer(
+        computer_number=computer_number,
+        laboratory_unit=laboratory_unit
+    )
+    
+    try:
+        db.session.add(computer)
+        db.session.commit()
+        flash('Computer added successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error adding computer', 'error')
+    
+    return redirect(url_for('admin_computers'))
+
+@app.route('/admin/computers/<int:computer_id>/update-status', methods=['POST'])
+@login_required
+@admin_required
+def update_computer_status(computer_id):
+    computer = Computer.query.get_or_404(computer_id)
+    new_status = request.form.get('status')
+    
+    if new_status not in ['vacant', 'occupied', 'maintenance']:
+        flash('Invalid status', 'error')
+        return redirect(url_for('admin_computers'))
+    
+    try:
+        computer.status = new_status
+        db.session.commit()
+        flash('Computer status updated successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error updating computer status', 'error')
+    
+    return redirect(url_for('admin_computers'))
+
+@app.route('/admin/computers/<int:computer_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_computer(computer_id):
+    computer = Computer.query.get_or_404(computer_id)
+    
+    try:
+        db.session.delete(computer)
+        db.session.commit()
+        flash('Computer deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error deleting computer', 'error')
+    
+    return redirect(url_for('admin_computers'))
 
 if __name__ == '__main__':
     init_db()  # Initialize database and create admin user

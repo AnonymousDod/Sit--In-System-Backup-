@@ -773,13 +773,22 @@
                     <div class="action-description">View past laboratory activities</div>
                 </div>
             </div>
-            <div class="action-card">
+            <div class="action-card" data-url="{{ url_for('admin_reports') }}">
                 <div class="action-icon">
                     <i class="fas fa-chart-bar"></i>
                 </div>
                 <div class="action-info">
                     <div class="action-title">Reports</div>
                     <div class="action-description">Generate usage and activity reports</div>
+                </div>
+            </div>
+            <div class="action-card" data-url="{{ url_for('admin_computers') }}">
+                <div class="action-icon">
+                    <i class="fas fa-desktop"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Computer Control</div>
+                    <div class="action-description">Manage computer status and availability</div>
                 </div>
             </div>
             <div class="action-card" data-url="{{ url_for('admin_announcements') }}">
