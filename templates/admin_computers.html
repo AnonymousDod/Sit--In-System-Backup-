@@ -145,12 +145,31 @@
         <div class="row mb-4">
             <div class="col-md-6">
                 <h2>Computer Control</h2>
+                <p class="text-muted">Manage computer status and availability in each laboratory</p>
             </div>
             <div class="col-md-6 text-end">
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addComputerModal">
                     <i class="fas fa-plus"></i>
                     Add Computer
                 </button>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>
+                            <h5 class="alert-heading mb-1">Status Guide</h5>
+                            <p class="mb-0">
+                                <span class="badge bg-success me-2">Vacant</span> - Computer is available for use
+                                <span class="badge bg-danger mx-2">Occupied</span> - Computer is currently in use
+                                <span class="badge bg-warning ms-2">Maintenance</span> - Computer is under maintenance
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

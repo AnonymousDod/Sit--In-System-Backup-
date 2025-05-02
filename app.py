@@ -13,6 +13,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+import secrets
 
 def login_required(f):
     @wraps(f)
@@ -44,9 +45,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///student_portal.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # File upload configuration
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = 'static/uploads/resources'
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
+app.config['ALLOWED_EXTENSIONS'] = {
+    'image': {'png', 'jpg', 'jpeg', 'gif'},
+    'video': {'mp4', 'webm', 'ogg'}
+}
 
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -56,27 +60,32 @@ db.init_app(app)
 
 def init_db():
     with app.app_context():
-        # Create all tables
-        db.create_all()
-        
-        # Check if admin user exists
-        admin = User.query.filter_by(id_number='admin').first()
-        if not admin:
-            # Create admin user
-            admin = User(
-                id_number='admin',
-                email='admin@admin.com',
-                first_name='Admin',
-                middle_name='',
-                last_name='User',
-                course='N/A',
-                year_level='N/A',
-                password=generate_password_hash('admin123'),
-                is_admin=True
-            )
-            db.session.add(admin)
-            db.session.commit()
-            print("Admin user created successfully!")
+        try:
+            # Create tables if they don't exist
+            db.create_all()
+            
+            # Check if admin user exists
+            admin = User.query.filter_by(id_number='admin').first()
+            if not admin:
+                # Create admin user
+                admin = User(
+                    id_number='admin',
+                    email='admin@admin.com',
+                    first_name='Admin',
+                    middle_name='',
+                    last_name='User',
+                    course='N/A',
+                    year_level='N/A',
+                    password=generate_password_hash('admin123'),
+                    is_admin=True,
+                    points=0  # Initialize points for admin
+                )
+                db.session.add(admin)
+                db.session.commit()
+                print("Admin user created successfully!")
+        except Exception as e:
+            print(f"Error initializing database: {str(e)}")
+            db.session.rollback()
 
 # Available courses and year levels
 COURSES = [
@@ -89,8 +98,8 @@ COURSES = [
 
 YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year']
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+def allowed_file(filename, file_type):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS'][file_type]
 
 @app.route('/')
 def index():
@@ -218,7 +227,7 @@ def profile():
         # Handle file upload
         if 'profile_image' in request.files:
             file = request.files['profile_image']
-            if file and file.filename and allowed_file(file.filename):
+            if file and file.filename and allowed_file(file.filename, 'image'):
                 filename = secure_filename(f"{session['user_id']}_{file.filename}")
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 user.profile_image = filename
@@ -578,6 +587,8 @@ class LabResource(db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(500))
     link = db.Column(db.String(500))
+    file_path = db.Column(db.String(500))  # Store the path to uploaded file
+    file_type = db.Column(db.String(50))   # Store the type of file (image/video)
     is_enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -600,10 +611,33 @@ def add_resource():
         flash('Resource name is required', 'error')
         return redirect(url_for('admin_resources'))
     
+    # Handle file upload
+    file_path = None
+    file_type = None
+    if 'file' in request.files:
+        file = request.files['file']
+        if file and file.filename:
+            # Determine file type
+            file_ext = file.filename.rsplit('.', 1)[1].lower()
+            if file_ext in app.config['ALLOWED_EXTENSIONS']['image']:
+                file_type = 'image'
+            elif file_ext in app.config['ALLOWED_EXTENSIONS']['video']:
+                file_type = 'video'
+            else:
+                flash('Invalid file type. Please upload an image or video file.', 'error')
+                return redirect(url_for('admin_resources'))
+            
+            # Save file
+            filename = secure_filename(f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
+            file_path = os.path.join('uploads/resources', filename)
+            file.save(os.path.join(app.static_folder, file_path))
+    
     resource = LabResource(
         name=name,
         description=description,
-        link=link
+        link=link,
+        file_path=file_path,
+        file_type=file_type
     )
     
     try:
@@ -640,6 +674,12 @@ def delete_resource(resource_id):
     resource = LabResource.query.get_or_404(resource_id)
     
     try:
+        # Delete the file if it exists
+        if resource.file_path:
+            file_path = os.path.join(app.static_folder, resource.file_path)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
         db.session.delete(resource)
         db.session.commit()
         flash('Resource deleted successfully!', 'success')
@@ -663,6 +703,27 @@ def user_reservations():
     reservations = Reservation.query.filter_by(user_id=user.id).order_by(Reservation.date.desc(), Reservation.time.desc()).all()
     return render_template('user_reservations.html', reservations=reservations)
 
+@app.route('/get_available_pcs/<laboratory>')
+@login_required
+def get_available_pcs(laboratory):
+    try:
+        # Get all vacant PCs in the selected laboratory
+        computers = Computer.query.filter_by(
+            laboratory_unit=laboratory,
+            status='vacant'
+        ).order_by(Computer.computer_number).all()
+        
+        return jsonify({
+            'success': True,
+            'pcs': [pc.to_dict() for pc in computers]
+        })
+    except Exception as e:
+        print(f"Error fetching PCs: {str(e)}")  # Log the error for debugging
+        return jsonify({
+            'success': False,
+            'message': 'Error fetching available PCs'
+        }), 500
+
 @app.route('/submit_reservation', methods=['POST'])
 @login_required
 def submit_reservation():
@@ -679,9 +740,16 @@ def submit_reservation():
         time = datetime.strptime(request.form.get('time'), '%H:%M').time()
         purpose = request.form.get('purpose')
         laboratory_unit = request.form.get('laboratory_unit')
+        pc_id = request.form.get('pc_number')
         
-        if not all([date, time, purpose, laboratory_unit]):
+        if not all([date, time, purpose, laboratory_unit, pc_id]):
             flash('Please fill in all fields', 'error')
+            return redirect(url_for('home'))
+        
+        # Check if the selected PC is available
+        computer = Computer.query.get(pc_id)
+        if not computer or computer.status != 'vacant':
+            flash('The selected PC is not available', 'error')
             return redirect(url_for('home'))
         
         # Check for existing reservations at the same time
@@ -702,19 +770,27 @@ def submit_reservation():
             date=date,
             time=time,
             purpose=purpose,
-            laboratory_unit=laboratory_unit
+            laboratory_unit=laboratory_unit,
+            computer_id=pc_id  # Add the computer_id to the reservation
         )
         
-        db.session.add(new_reservation)
-        db.session.commit()
+        # Update computer status to reserved
+        computer.status = 'reserved'
         
-        flash('Reservation submitted successfully!', 'success')
+        try:
+            db.session.add(new_reservation)
+            db.session.commit()
+            flash('Reservation submitted successfully!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred while submitting reservation', 'error')
+            print(f"Error submitting reservation: {str(e)}")
         
+        return redirect(url_for('home'))
     except Exception as e:
         flash('An error occurred while submitting reservation', 'error')
         print(f"Error submitting reservation: {str(e)}")
-    
-    return redirect(url_for('home'))
+        return redirect(url_for('home'))
 
 @app.route('/admin/reservations')
 @login_required
@@ -871,6 +947,12 @@ def end_session(session_id):
         return jsonify({'error': 'Session already completed'}), 400
     
     try:
+        # Get the computer associated with the session
+        computer = Computer.query.get(lab_session.computer_id)
+        if computer:
+            # Update computer status back to vacant
+            computer.status = 'vacant'
+        
         lab_session.status = 'completed'
         lab_session.end_time = datetime.utcnow()
         db.session.commit()
@@ -909,8 +991,34 @@ def start_session_from_reservation(reservation_id):
         }), 400
     
     try:
-        # Get the user
+        # Get the user and computer
         user = User.query.get(reservation.user_id)
+        computer = Computer.query.get(reservation.computer_id)
+        
+        if not computer:
+            return jsonify({
+                'success': False,
+                'message': 'Computer not found'
+            }), 404
+        
+        # Check if computer is available (either vacant or reserved by this user)
+        if computer.status not in ['vacant', 'reserved']:
+            return jsonify({
+                'success': False,
+                'message': 'Computer is not available'
+            }), 400
+        
+        # If computer is reserved, verify it's reserved by this user
+        if computer.status == 'reserved':
+            active_reservation = Reservation.query.filter_by(
+                computer_id=computer.id,
+                status='approved'
+            ).first()
+            if not active_reservation or active_reservation.user_id != user.id:
+                return jsonify({
+                    'success': False,
+                    'message': 'Computer is reserved by another user'
+                }), 400
         
         # Check if user has remaining sessions
         if user.remaining_sessions <= 0:
@@ -924,8 +1032,12 @@ def start_session_from_reservation(reservation_id):
             user_id=reservation.user_id,
             purpose=reservation.purpose,
             laboratory_unit=reservation.laboratory_unit,
+            computer_id=reservation.computer_id,
             start_time=datetime.utcnow()
         )
+        
+        # Update computer status to occupied
+        computer.status = 'occupied'
         
         # Decrement remaining sessions
         user.remaining_sessions -= 1
@@ -1017,12 +1129,15 @@ def export_report(report_type, format_type):
     if report_type == 'user_activity':
         data = get_user_activity_data(start_date, end_date)
         title = "User Activity Report"
+       
     elif report_type == 'lab_usage':
         data = get_lab_usage_data(start_date, end_date)
         title = "Laboratory Usage Report"
+        description = "This report shows the laboratory usage in the system during the selected date range."
     elif report_type == 'statistics':
         data = get_statistics_data(start_date, end_date)
         title = "Statistics Report"
+        description = "This report shows the statistics of the system during the selected date range."
     else:
         flash('Invalid report type', 'error')
         return redirect(url_for('admin_reports'))
@@ -1353,6 +1468,95 @@ def delete_computer(computer_id):
         flash('Error deleting computer', 'error')
     
     return redirect(url_for('admin_computers'))
+
+@app.route('/admin/add-points', methods=['GET'])
+@app.route('/admin/users/<int:user_id>/add-points', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def add_points(user_id=None):
+    if request.method == 'GET':
+        if user_id is None:
+            # Show list of all non-admin users
+            users = User.query.filter_by(is_admin=False).order_by(User.last_name).all()
+            return render_template('add_points.html', users=users)
+        else:
+            # Show form for specific user
+            user = User.query.get_or_404(user_id)
+            return render_template('add_points.html', user=user)
+    
+    # Handle POST request
+    points = request.form.get('points', type=int)
+    
+    if points is None or points <= 0:
+        return jsonify({
+            'success': False,
+            'message': 'Please provide a valid number of points'
+        }), 400
+    
+    try:
+        user = User.query.get_or_404(user_id)
+        user.points += points
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': f'Added {points} points to {user.first_name} {user.last_name}',
+            'new_points': user.points
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error adding points: {str(e)}'
+        }), 500
+
+@app.route('/admin/leaderboard')
+@login_required
+@admin_required
+def leaderboard():
+    # Get all non-admin users with points greater than 0, ordered by points in descending order
+    users = User.query.filter(
+        User.is_admin == False,
+        User.points > 0
+    ).order_by(User.points.desc()).all()
+    
+    return render_template('leaderboard.html', users=users)
+
+@app.route('/user/activity-history')
+@login_required
+def user_activity_history():
+    user = User.query.filter_by(id_number=session['user_id']).first()
+    if not user:
+        flash('User not found', 'error')
+        return redirect(url_for('home'))
+    
+    # Get all completed sessions for the user
+    completed_sessions = Session.query.filter_by(
+        user_id=user.id,
+        status='completed'
+    ).order_by(Session.end_time.desc()).all()
+    
+    # Get all past reservations (completed or rejected)
+    past_reservations = Reservation.query.filter(
+        Reservation.user_id == user.id,
+        Reservation.status.in_(['completed', 'rejected'])
+    ).order_by(Reservation.date.desc(), Reservation.time.desc()).all()
+    
+    # Calculate statistics
+    total_hours = sum((session.end_time - session.start_time).total_seconds() / 3600 for session in completed_sessions)
+    total_sessions = len(completed_sessions)
+    total_reservations = len(past_reservations)
+    
+    stats = {
+        'total_hours': round(total_hours, 2),
+        'total_sessions': total_sessions,
+        'total_reservations': total_reservations,
+        'remaining_sessions': user.remaining_sessions
+    }
+    
+    return render_template('history.html',
+                         sessions=completed_sessions,
+                         reservations=past_reservations,
+                         stats=stats)
 
 if __name__ == '__main__':
     init_db()  # Initialize database and create admin user

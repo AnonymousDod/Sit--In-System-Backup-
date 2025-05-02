@@ -94,20 +94,19 @@
         }
 
         .logout-btn {
-            background: #ef4444;
-            color: var(--white);
+            color: white;
             text-decoration: none;
             padding: 0.5rem 1rem;
             border-radius: 0.5rem;
+            background: #ef4444;
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            transition: all 0.3s ease;
-            font-size: 0.875rem;
         }
 
         .logout-btn:hover {
             background: #dc2626;
+            color: white;
         }
 
         .main-content {
@@ -411,12 +410,12 @@
         }
 
         .flash-message.success {
-            background: #10b981;
+            background: var(--success-color);
             color: white;
         }
 
         .flash-message.error {
-            background: #ef4444;
+            background: var(--error-color);
             color: white;
         }
 
@@ -447,12 +446,23 @@
 
         @keyframes slideIn {
             from {
-                transform: translateX(100%);
+                transform: translateY(-10px);
                 opacity: 0;
             }
             to {
-                transform: translateX(0);
+                transform: translateY(0);
                 opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateY(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateY(-10px);
+                opacity: 0;
             }
         }
 
@@ -489,199 +499,35 @@
             cursor: not-allowed;
         }
 
-        .users-dropdown {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: var(--white);
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 1rem;
-            z-index: 1000;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .action-card:hover .users-dropdown {
-            display: block;
-        }
-
-        .users-dropdown table {
-            margin-bottom: 0;
-        }
-
-        .users-dropdown .btn-group {
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
             display: flex;
-            gap: 0.25rem;
-        }
-
-        .users-dropdown .btn {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-        }
-
-        .users-dropdown .badge {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-        }
-
-        .announcements-dropdown {
-            display: none;
-        }
-
-        .action-card:hover .announcements-dropdown {
-            display: none;
-        }
-
-        .announcements-header {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 1rem;
-        }
-
-        .announcements-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .announcement-item {
-            padding: 0.75rem;
-            border-bottom: 1px solid #e5e7eb;
-            background: var(--white);
-        }
-
-        .announcement-item:last-child {
-            border-bottom: none;
-        }
-
-        .announcement-title {
-            display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .announcement-title h3 {
+            gap: 0.5rem;
             font-size: 0.875rem;
-            color: var(--text-color);
-            margin: 0;
-        }
-
-        .announcement-content {
-            color: var(--text-light);
-            font-size: 0.75rem;
-            margin-bottom: 0.5rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .announcement-time {
-            color: var(--text-light);
-            font-size: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
             font-weight: 500;
+            transition: all 0.3s ease;
         }
 
-        .badge.normal {
-            background: #3b82f6;
-            color: white;
+        .btn-primary {
+            background: var(--primary-color);
+            color: var(--white);
         }
 
-        .badge.important {
-            background: #f59e0b;
-            color: white;
+        .btn-primary:hover {
+            background: var(--secondary-color);
         }
 
-        .badge.urgent {
-            background: #ef4444;
-            color: white;
+        .btn-secondary {
+            background: #e5e7eb;
+            color: var(--text-color);
         }
 
-        .btn-sm {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-        }
-
-        .reservations-dropdown {
-            display: none;
-        }
-
-        .action-card:hover .reservations-dropdown {
-            display: none;
-        }
-
-        .reservations-header {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 1rem;
-        }
-
-        .reservations-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .reservation-item {
-            padding: 0.75rem;
-            border-bottom: 1px solid #e5e7eb;
-            background: var(--white);
-        }
-
-        .reservation-item:last-child {
-            border-bottom: none;
-        }
-
-        .reservation-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .reservation-details {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .reservation-purpose {
-            color: var(--text-light);
-            font-size: 0.75rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .badge.bg-warning {
-            background: #f59e0b;
-            color: white;
-        }
-
-        .badge.bg-success {
-            background: #10b981;
-            color: white;
-        }
-
-        .badge.bg-danger {
-            background: #ef4444;
-            color: white;
-        }
-
-        .badge.bg-secondary {
-            background: #6b7280;
-            color: white;
+        .btn-secondary:hover {
+            background: #d1d5db;
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -809,6 +655,24 @@
                     <p>View user feedback</p>
                 </div>
             </div>
+            <div class="action-card" data-url="{{ url_for('leaderboard') }}">
+                <div class="action-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <div class="action-info">
+                    <h3>Leaderboard</h3>
+                    <p>View top performing students</p>
+                </div>
+            </div>
+            <div class="action-card" id="addPointsCard" data-url="{{ url_for('add_points') }}">
+                <div class="action-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="action-info">
+                    <h3>Add Points</h3>
+                    <p>Reward students with points</p>
+                </div>
+            </div>
         </div>
 
         <div class="stats-grid">
@@ -862,6 +726,7 @@
         </div>
     </main>
 
+    <!-- Remove the points modal -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Mobile menu toggle

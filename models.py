@@ -19,6 +19,7 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     remaining_sessions = db.Column(db.Integer, default=30)
+    points = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     sessions = db.relationship('Session', backref='user', lazy=True)
@@ -75,11 +76,15 @@ class Announcement(db.Model):
 class Session(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    purpose = db.Column(db.String(100), nullable=False)
+    laboratory_unit = db.Column(db.String(50), nullable=False)
+    computer_id = db.Column(db.Integer, db.ForeignKey('computers.id'), nullable=False)
     start_time = db.Column(db.DateTime, default=datetime.utcnow)
     end_time = db.Column(db.DateTime)
     status = db.Column(db.String(20), default='active')  # active, completed
-    purpose = db.Column(db.String(200))
-    laboratory_unit = db.Column(db.String(100))
+
+    # Add relationship to Computer model
+    computer = db.relationship('Computer', backref='sessions')
 
     def __repr__(self):
         return f'<Session {self.id}>'
@@ -88,13 +93,12 @@ class Session(db.Model):
         return {
             'id': self.id,
             'user_id': self.user_id,
-            'user_name': f"{self.user.first_name} {self.user.last_name}",
-            'id_number': self.user.id_number,
-            'start_time': self.start_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'end_time': self.end_time.strftime('%Y-%m-%d %H:%M:%S') if self.end_time else None,
-            'status': self.status,
             'purpose': self.purpose,
-            'laboratory_unit': self.laboratory_unit
+            'laboratory_unit': self.laboratory_unit,
+            'computer_id': self.computer_id,
+            'start_time': self.start_time.strftime('%Y-%m-%d %H:%M'),
+            'end_time': self.end_time.strftime('%Y-%m-%d %H:%M') if self.end_time else None,
+            'status': self.status
         }
 
 class Reservation(db.Model):
@@ -104,8 +108,12 @@ class Reservation(db.Model):
     time = db.Column(db.Time, nullable=False)
     purpose = db.Column(db.String(100), nullable=False)
     laboratory_unit = db.Column(db.String(50), nullable=False)
+    computer_id = db.Column(db.Integer, db.ForeignKey('computers.id'), nullable=False)
     status = db.Column(db.String(20), default='pending')  # pending, approved, rejected, completed
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Add relationship to Computer model
+    computer = db.relationship('Computer', backref='reservations')
 
     def __repr__(self):
         return f'<Reservation {self.id}>'
@@ -118,6 +126,7 @@ class Reservation(db.Model):
             'time': self.time.strftime('%H:%M'),
             'purpose': self.purpose,
             'laboratory_unit': self.laboratory_unit,
+            'computer_id': self.computer_id,
             'status': self.status,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
         }

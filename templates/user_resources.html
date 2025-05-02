@@ -88,6 +88,40 @@
                     </div>
                     <h5 class="mb-2">{{ resource.name }}</h5>
                     <p class="resource-description">{{ resource.description }}</p>
+                    {% if resource.file_path %}
+                        {% if resource.file_type == 'image' %}
+                            <div class="mb-3 text-center">
+                                <img src="{{ url_for('static', filename=resource.file_path) }}" alt="{{ resource.name }}" class="img-fluid rounded clickable-image" style="cursor:pointer;max-height:200px;" data-bs-toggle="modal" data-bs-target="#imageModal{{ resource.id }}">
+                            </div>
+                            <!-- Modal for image preview and download -->
+                            <div class="modal fade" id="imageModal{{ resource.id }}" tabindex="-1" aria-labelledby="imageModalLabel{{ resource.id }}" aria-hidden="true">
+                              <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                  <div class="modal-header">
+                                    <h5 class="modal-title" id="imageModalLabel{{ resource.id }}">{{ resource.name }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                  </div>
+                                  <div class="modal-body text-center">
+                                    <img src="{{ url_for('static', filename=resource.file_path) }}" alt="{{ resource.name }}" class="img-fluid rounded mb-3">
+                                    <a href="{{ url_for('static', filename=resource.file_path) }}" download class="btn btn-primary">
+                                      <i class="fas fa-download"></i> Download Image
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                        {% elif resource.file_type == 'video' %}
+                            <div class="mb-3 text-center">
+                                <video class="w-100 rounded" controls style="max-height:200px;">
+                                    <source src="{{ url_for('static', filename=resource.file_path) }}" type="video/{{ resource.file_path.split('.')[-1] }}">
+                                    Your browser does not support the video tag.
+                                </video>
+                                <a href="{{ url_for('static', filename=resource.file_path) }}" download class="btn btn-primary mt-2">
+                                  <i class="fas fa-download"></i> Download Video
+                                </a>
+                            </div>
+                        {% endif %}
+                    {% endif %}
                     {% if resource.link != '-' %}
                     <a href="{{ resource.link }}" target="_blank" class="resource-link">
                         <i class="fas fa-external-link-alt"></i>

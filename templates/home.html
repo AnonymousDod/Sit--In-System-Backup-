@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CICS Laboratory System - Student Portal</title>
+    <title>Sit-In Monitoring System</title>
     <style>
         * {
             margin: 0;
@@ -584,7 +584,7 @@
                 <p>Access laboratory computers, equipment, and learning materials</p>
             </a>
 
-            <a href="#" class="card" id="history">
+            <a href="{{ url_for('user_activity_history') }}" class="card" id="history">
                 <div class="card-icon">
                     <i class="fas fa-history"></i>
                 </div>
@@ -787,15 +787,21 @@
                         </div>
                         <div class="form-group">
                             <label for="laboratoryUnit">Laboratory Unit</label>
-                            <select id="laboratoryUnit" name="laboratory_unit" required class="form-control">
+                            <select id="laboratoryUnit" name="laboratory_unit" required class="form-control" onchange="updateAvailablePCs()">
                                 <option value="">Select a laboratory unit</option>
-                                <option value="lab1">Laboratory 524</option>
-                                <option value="lab2">Laboratory 526</option>
-                                <option value="lab3">Laboratory 528</option>
-                                <option value="lab4">Laboratory 530</option>
-                                <option value="lab5">Laboratory 542</option>
-                                <option value="lab6">Laboratory 544</option>
-                                <option value="lab7">Laboratory 517</option>
+                                <option value="Laboratory 524 - Programming Lab">Laboratory 524 - Programming Lab</option>
+                                <option value="Laboratory 526 - Networking Lab">Laboratory 526 - Networking Lab</option>
+                                <option value="Laboratory 528 - Hardware Lab">Laboratory 528 - Hardware Lab</option>
+                                <option value="Laboratory 530 - Multimedia Lab">Laboratory 530 - Multimedia Lab</option>
+                                <option value="Laboratory 542 - Research Lab">Laboratory 542 - Research Lab</option>
+                                <option value="Laboratory 544 - Project Lab">Laboratory 544 - Project Lab</option>
+                                <option value="Laboratory 517 - Special Lab">Laboratory 517 - Special Lab</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="pcNumber">Select PC</label>
+                            <select id="pcNumber" name="pc_number" required class="form-control">
+                                <option value="">Select a laboratory first</option>
                             </select>
                         </div>
                         <button type="submit" class="submit-btn">
@@ -852,21 +858,19 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Handle card clicks
-            const cardActions = {
+            var actions = {
                 'makeReservation': function() { openReservationModal(); },
                 'labRules': function() { openRulesModal(); },
-                'labResources': function() { alert('Lab resources feature coming soon!'); },
-                'history': function() { alert('History feature coming soon!'); },
                 'feedback': function() { openFeedbackModal(); }
             };
 
             // Add click handlers to each card
-            Object.keys(cardActions).forEach(function(id) {
+            Object.keys(actions).forEach(function(id) {
                 const element = document.getElementById(id);
                 if (element) {
                     element.addEventListener('click', function(e) {
                         e.preventDefault();
-                        cardActions[id]();
+                        actions[id]();
                     });
                 }
             });
@@ -893,6 +897,7 @@
                 reservationForm.addEventListener('submit', function(e) {
                     e.preventDefault();
                     
+                    // Validate all required fields
                     // Validate time
                     const timeInput = document.getElementById('reservationTime');
                     if (!timeInput.value) {
@@ -1038,6 +1043,60 @@
                     return;
                 }
             });
+        }
+
+        // Function to update available PCs based on selected laboratory
+        function updateAvailablePCs() {
+            const laboratorySelect = document.getElementById('laboratoryUnit');
+            const pcSelect = document.getElementById('pcNumber');
+            const selectedLab = laboratorySelect.value;
+
+            // Clear current options
+            pcSelect.innerHTML = '<option value="">Loading available PCs...</option>';
+
+            if (!selectedLab) {
+                pcSelect.innerHTML = '<option value="">Select a laboratory first</option>';
+                return;
+            }
+
+            // Fetch available PCs for the selected laboratory
+            fetch(`/get_available_pcs/${encodeURIComponent(selectedLab)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.message || 'Error fetching PCs');
+                    }
+                    
+                    pcSelect.innerHTML = '';
+                    if (!data.pcs || data.pcs.length === 0) {
+                        pcSelect.innerHTML = '<option value="">No available PCs in this laboratory</option>';
+                        return;
+                    }
+
+                    // Add a default option
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Select a PC';
+                    pcSelect.appendChild(defaultOption);
+
+                    // Add PC options
+                    data.pcs.forEach(pc => {
+                        const option = document.createElement('option');
+                        option.value = pc.id;
+                        option.textContent = `PC ${pc.computer_number} (${pc.status})`;
+                        option.disabled = pc.status !== 'vacant';
+                        pcSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching PCs:', error);
+                    pcSelect.innerHTML = '<option value="">Error loading PCs. Please try again.</option>';
+                });
         }
     </script>
 </body>

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Activity History</h2>
+    
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Hours</h5>
+                    <h2 class="card-text">{{ stats.total_hours }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Completed Sessions</h5>
+                    <h2 class="card-text">{{ stats.total_sessions }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Past Reservations</h5>
+                    <h2 class="card-text">{{ stats.total_reservations }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Remaining Sessions</h5>
+                    <h2 class="card-text">{{ stats.remaining_sessions }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sessions History -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4 class="mb-0">Completed Sessions</h4>
+        </div>
+        <div class="card-body">
+            {% if sessions %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Laboratory</th>
+                            <th>Computer</th>
+                            <th>Purpose</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in sessions %}
+                        <tr>
+                            <td>{{ session.start_time.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ session.laboratory_unit }}</td>
+                            <td>{{ session.computer.computer_number }}</td>
+                            <td>{{ session.purpose }}</td>
+                            <td>
+                                {% if session.end_time %}
+                                    {{ ((session.end_time - session.start_time).total_seconds() / 3600)|round(2) }} hours
+                                {% else %}
+                                    Ongoing
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No completed sessions found.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Reservations History -->
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">Past Reservations</h4>
+        </div>
+        <div class="card-body">
+            {% if reservations %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Laboratory</th>
+                            <th>Computer</th>
+                            <th>Purpose</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reservation in reservations %}
+                        <tr>
+                            <td>{{ reservation.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ reservation.time.strftime('%I:%M %p') }}</td>
+                            <td>{{ reservation.laboratory_unit }}</td>
+                            <td>{{ reservation.computer.computer_number }}</td>
+                            <td>{{ reservation.purpose }}</td>
+                            <td>
+                                <span class="badge {% if reservation.status == 'completed' %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ reservation.status|title }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No past reservations found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+.card:hover {
+    transform: translateY(-5px);
+}
+.table th {
+    background-color: #f8f9fa;
+}
+.badge {
+    font-size: 0.9em;
+    padding: 0.5em 0.8em;
+}
+</style>
+{% endblock %} 
