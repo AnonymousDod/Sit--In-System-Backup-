@@ -1231,66 +1231,66 @@ def generate_pdf_report(data, title):
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     elements = []
-    
-    # Add title
     elements.append(Paragraph(title, styles['Title']))
     elements.append(Spacer(1, 12))
-    
-    # Create table data
-    if isinstance(data, list):
-        # For user activity and lab usage reports
-        table_data = [list(data[0].keys())]  # Headers
+    # Table data
+    if isinstance(data, list) and data:
+        table_data = [list(data[0].keys())]
         for row in data:
             table_data.append(list(row.values()))
-    else:
+        table = Table(table_data, repeatRows=1)
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ])
+        table.setStyle(style)
+        elements.append(table)
+    elif isinstance(data, dict):
         # For statistics report
-        table_data = [
+        stats_table = [
             ['Metric', 'Value'],
             ['Total Sessions', str(data['total_sessions'])],
             ['Active Sessions', str(data['active_sessions'])],
             ['Completed Sessions', str(data['completed_sessions'])]
         ]
-        elements.append(Paragraph('Purpose Statistics', styles['Heading2']))
-        elements.append(Spacer(1, 12))
-        purpose_data = [['Purpose', 'Count']] + data['purpose_stats']
-        purpose_table = Table(purpose_data)
-        purpose_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        table = Table(stats_table, repeatRows=1)
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 14),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 12),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        elements.append(purpose_table)
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ])
+        table.setStyle(style)
+        elements.append(table)
         elements.append(Spacer(1, 20))
-    
-    # Create main table
-    table = Table(table_data)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 14),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 12),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    elements.append(table)
-    
-    # Build PDF
+        # Purpose statistics
+        if 'purpose_stats' in data:
+            elements.append(Paragraph('Purpose Statistics', styles['Heading2']))
+            elements.append(Spacer(1, 12))
+            purpose_data = [['Purpose', 'Count']] + data['purpose_stats']
+            purpose_table = Table(purpose_data, repeatRows=1)
+            purpose_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ])
+            purpose_table.setStyle(purpose_style)
+            elements.append(purpose_table)
+            elements.append(Spacer(1, 20))
     doc.build(elements)
     buffer.seek(0)
-    
     return send_file(
         buffer,
         as_attachment=True,
@@ -1557,6 +1557,184 @@ def user_activity_history():
                          sessions=completed_sessions,
                          reservations=past_reservations,
                          stats=stats)
+
+# Store the schedule in a global variable for demo edit functionality
+SCHEDULE_DATA = None
+
+@app.route('/admin/lab-schedule', methods=['GET'])
+@login_required
+@admin_required
+def admin_lab_schedule():
+    global SCHEDULE_DATA
+    labs = [
+        'Laboratory 517', 'Laboratory 524', 'Laboratory 526',
+        'Laboratory 528', 'Laboratory 530', 'Laboratory 542', 'Laboratory 544'
+    ]
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    times = [
+        '7:00-8:00', '8:00-9:00', '9:00-10:00', '10:00-11:00',
+        '11:00-12:00', '12:00-1:00', '1:00-2:00', '2:00-3:00', '3:00-4:00'
+    ]
+    # Initialize or use global schedule
+    if SCHEDULE_DATA is None:
+        SCHEDULE_DATA = {lab: {day: {time: None for time in times} for day in days} for lab in labs}
+        SCHEDULE_DATA['Laboratory 517']['Monday']['8:00-9:00'] = {'course': 'BIOLOG', 'instructor': 'M. Magsino'}
+        SCHEDULE_DATA['Laboratory 517']['Tuesday']['8:00-9:00'] = {'course': 'COMP PROG', 'instructor': 'M. Magsino'}
+        SCHEDULE_DATA['Laboratory 524']['Wednesday']['9:00-10:00'] = {'course': 'PHYSICS', 'instructor': 'J. Santos'}
+        SCHEDULE_DATA['Laboratory 526']['Thursday']['10:00-11:00'] = {'course': 'CHEMISTRY', 'instructor': 'A. Cruz'}
+    selected_lab = request.args.get('lab', labs[0])
+    return render_template(
+        'lab_schedule.html',
+        labs=labs,
+        selected_lab=selected_lab,
+        days=days,
+        times=times,
+        schedule=SCHEDULE_DATA
+    )
+
+@app.route('/admin/lab-schedule/edit', methods=['POST'])
+@login_required
+@admin_required
+def edit_lab_schedule():
+    global SCHEDULE_DATA
+    lab = request.form['lab']
+    day = request.form['day']
+    time = request.form['time']
+    course = request.form['course']
+    instructor = request.form['instructor']
+    # Update the schedule in memory
+    if SCHEDULE_DATA and lab in SCHEDULE_DATA and day in SCHEDULE_DATA[lab] and time in SCHEDULE_DATA[lab][day]:
+        SCHEDULE_DATA[lab][day][time] = {'course': course, 'instructor': instructor}
+        flash('Schedule updated!', 'success')
+    else:
+        flash('Invalid schedule update.', 'error')
+    return redirect(url_for('admin_lab_schedule', lab=lab))
+
+@app.route('/admin/export/lab_schedule/<format_type>', methods=['POST'])
+@login_required
+@admin_required
+def export_lab_schedule(format_type):
+    global SCHEDULE_DATA
+    lab = request.form.get('lab')
+    # Ensure SCHEDULE_DATA is initialized
+    if SCHEDULE_DATA is None:
+        labs = [
+            'Laboratory 517', 'Laboratory 524', 'Laboratory 526',
+            'Laboratory 528', 'Laboratory 530', 'Laboratory 542', 'Laboratory 544'
+        ]
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        times = [
+            '7:00-8:00', '8:00-9:00', '9:00-10:00', '10:00-11:00',
+            '11:00-12:00', '12:00-1:00', '1:00-2:00', '2:00-3:00', '3:00-4:00'
+        ]
+        SCHEDULE_DATA = {lab: {day: {time: None for time in times} for day in days} for lab in labs}
+        SCHEDULE_DATA['Laboratory 517']['Monday']['8:00-9:00'] = {'course': 'BIOLOG', 'instructor': 'M. Magsino'}
+        SCHEDULE_DATA['Laboratory 517']['Tuesday']['8:00-9:00'] = {'course': 'COMP PROG', 'instructor': 'M. Magsino'}
+        SCHEDULE_DATA['Laboratory 524']['Wednesday']['9:00-10:00'] = {'course': 'PHYSICS', 'instructor': 'J. Santos'}
+        SCHEDULE_DATA['Laboratory 526']['Thursday']['10:00-11:00'] = {'course': 'CHEMISTRY', 'instructor': 'A. Cruz'}
+    data = []
+    labs = [lab] if lab and lab in SCHEDULE_DATA else list(SCHEDULE_DATA.keys())
+    for lab_name in labs:
+        for day, timeslots in SCHEDULE_DATA[lab_name].items():
+            for time, slot in timeslots.items():
+                course = slot['course'] if slot else ''
+                instructor = slot['instructor'] if slot else ''
+                data.append({
+                    'Laboratory': lab_name,
+                    'Day': day,
+                    'Time': time,
+                    'Course': course,
+                    'Instructor': instructor
+                })
+    if format_type == 'csv':
+        output = StringIO()
+        writer = csv.DictWriter(output, fieldnames=['Laboratory', 'Day', 'Time', 'Course', 'Instructor'])
+        writer.writeheader()
+        for row in data:
+            writer.writerow(row)
+        output.seek(0)
+        return send_file(
+            BytesIO(output.getvalue().encode()),
+            as_attachment=True,
+            download_name='lab_schedule.csv',
+            mimetype='text/csv'
+        )
+    elif format_type == 'xml':
+        root = ET.Element('LabSchedule')
+        for row in data:
+            entry = ET.SubElement(root, 'Entry')
+            for key, value in row.items():
+                ET.SubElement(entry, key).text = value
+        tree = ET.ElementTree(root)
+        output = StringIO()
+        tree.write(output, encoding='unicode', xml_declaration=True)
+        output.seek(0)
+        return send_file(
+            BytesIO(output.getvalue().encode()),
+            as_attachment=True,
+            download_name='lab_schedule.xml',
+            mimetype='application/xml'
+        )
+    elif format_type == 'pdf':
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+        elements = []
+        # If exporting all labs, do a table per lab
+        labs_to_export = labs
+        for lab_name in labs_to_export:
+            elements.append(Paragraph('Laboratory Schedule', styles['Title']))
+            elements.append(Paragraph(f'Room: {lab_name}', styles['Heading2']))
+            elements.append(Spacer(1, 12))
+            # Get all days and times
+            days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+            times = [
+                '7:00-8:00', '8:00-9:00', '9:00-10:00', '10:00-11:00',
+                '11:00-12:00', '12:00-1:00', '1:00-2:00', '2:00-3:00', '3:00-4:00'
+            ]
+            # Table header
+            table_data = [['Time'] + days]
+            # Table rows
+            for time in times:
+                row = [time]
+                for day in days:
+                    slot = SCHEDULE_DATA[lab_name][day][time]
+                    if slot and slot.get('course'):
+                        cell = f"{slot['course']}\n{slot['instructor']}\n{time}"
+                    else:
+                        cell = 'Vacant Time'
+                    row.append(cell)
+                table_data.append(row)
+            # Create table
+            table = Table(table_data, repeatRows=1)
+            # Style
+            style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ])
+            # Green background for 'Vacant Time'
+            for row_idx in range(1, len(table_data)):
+                for col_idx in range(1, len(days)+1):
+                    if table_data[row_idx][col_idx] == 'Vacant Time':
+                        style.add('BACKGROUND', (col_idx, row_idx), (col_idx, row_idx), colors.HexColor('#b9fbc0'))
+            table.setStyle(style)
+            elements.append(table)
+            elements.append(Spacer(1, 24))
+        doc.build(elements)
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name='lab_schedule.pdf',
+            mimetype='application/pdf'
+        )
+    else:
+        return 'Invalid format', 400
 
 if __name__ == '__main__':
     init_db()  # Initialize database and create admin user

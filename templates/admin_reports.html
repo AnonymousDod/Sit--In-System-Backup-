@@ -169,6 +169,34 @@
                     </form>
                 </div>
             </div>
+
+            <div class="col-md-6">
+                <div class="report-card">
+                    <h3><i class="fas fa-calendar-alt"></i> Lab Schedule Export</h3>
+                    <form id="labScheduleExportForm" action="{{ url_for('export_lab_schedule', format_type='pdf') }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Select Laboratory (optional)</label>
+                            <select class="form-select" name="lab">
+                                <option value="">All Laboratories</option>
+                                {% for lab in ['Laboratory 517', 'Laboratory 524', 'Laboratory 526', 'Laboratory 528', 'Laboratory 530', 'Laboratory 542', 'Laboratory 544'] %}
+                                    <option value="{{ lab }}">{{ lab }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="export-options">
+                            <button type="submit" class="btn btn-danger export-btn">
+                                <i class="fas fa-file-pdf"></i> Export PDF
+                            </button>
+                            <button type="button" onclick="exportLabSchedule('csv')" class="btn btn-success export-btn">
+                                <i class="fas fa-file-csv"></i> Export CSV
+                            </button>
+                            <button type="button" onclick="exportLabSchedule('xml')" class="btn btn-primary export-btn">
+                                <i class="fas fa-file-code"></i> Export XML
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -211,6 +239,37 @@
             .catch(error => {
                 console.error('Error:', error);
                 alert('Error exporting report');
+            });
+        }
+
+        function exportLabSchedule(formatType) {
+            const form = document.getElementById('labScheduleExportForm');
+            const lab = form.querySelector('select[name="lab"]').value;
+            const formData = new FormData();
+            formData.append('lab', lab);
+            fetch(`/admin/export/lab_schedule/${formatType}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('Network response was not ok');
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `lab_schedule.${formatType}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error exporting lab schedule');
             });
         }
     </script>
