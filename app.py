@@ -629,8 +629,8 @@ def add_resource():
             
             # Save file
             filename = secure_filename(f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{file.filename}")
-            file_path = os.path.join('uploads/resources', filename)
-            file.save(os.path.join(app.static_folder, file_path))
+            file_path = os.path.join('uploads', 'resources', filename).replace('\\', '/')
+            file.save(os.path.join(app.static_folder, 'uploads', 'resources', filename))
     
     resource = LabResource(
         name=name,

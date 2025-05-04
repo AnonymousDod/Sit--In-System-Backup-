@@ -1,5 +1,6 @@
 from app import app, db
 import sqlite3
+import os
 
 def migrate_resources():
     with app.app_context():
@@ -30,5 +31,30 @@ def migrate_resources():
         finally:
             conn.close()
 
+def fix_resource_file_paths():
+    from app import db, LabResource
+    import os
+    
+    with app.app_context():
+        resources = LabResource.query.all()
+        changed = 0
+        for resource in resources:
+            if resource.file_path:
+                fixed_path = resource.file_path.replace('\\', '/')
+                if not fixed_path.startswith('uploads/resources/'):
+                    filename = os.path.basename(fixed_path)
+                    fixed_path = f'uploads/resources/{filename}'
+                full_path = os.path.join('static', 'uploads', 'resources', os.path.basename(fixed_path))
+                if os.path.exists(full_path):
+                    if resource.file_path != fixed_path:
+                        resource.file_path = fixed_path
+                        changed += 1
+        if changed > 0:
+            db.session.commit()
+            print(f"Fixed {changed} resource file_path entries.")
+        else:
+            print("No file_path entries needed fixing.")
+
 if __name__ == '__main__':
-    migrate_resources() 
+    migrate_resources()
+    fix_resource_file_paths() 
