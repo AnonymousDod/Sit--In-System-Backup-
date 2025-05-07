@@ -1,10 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session as flask_session, send_from_directory, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 import os
 from werkzeug.utils import secure_filename
 from models import db, User, Feedback, Announcement, Reservation, Session, Computer
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from functools import wraps
 import csv
 import xml.etree.ElementTree as ET
@@ -18,7 +18,7 @@ import secrets
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
+        if 'user_id' not in flask_session:
             flash('Please log in to access this page.', 'error')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
@@ -27,10 +27,10 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
+        if 'user_id' not in flask_session:
             flash('Please log in to access this page.', 'error')
             return redirect(url_for('index'))
-        user = User.query.filter_by(id_number=session['user_id']).first()
+        user = User.query.filter_by(id_number=flask_session['user_id']).first()
         if not user or not user.is_admin:
             flash('Unauthorized access. Admin privileges required.', 'error')
             return redirect(url_for('home'))
@@ -103,8 +103,8 @@ def allowed_file(filename, file_type):
 
 @app.route('/')
 def index():
-    if 'user_id' in session:
-        user = User.query.filter_by(id_number=session['user_id']).first()
+    if 'user_id' in flask_session:
+        user = User.query.filter_by(id_number=flask_session['user_id']).first()
         if user and user.is_admin:
             return redirect(url_for('admin_dashboard'))
         return redirect(url_for('home'))
@@ -112,25 +112,35 @@ def index():
 
 @app.route('/home')
 def home():
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user:
-        session.pop('user_id', None)  # Clear invalid session
+        flask_session.pop('user_id', None)  # Clear invalid session
         flash('User not found. Please log in again.', 'error')
         return redirect(url_for('index'))
     
     if user.is_admin:
         return redirect(url_for('admin_dashboard'))
     
+    # Notify user of any rejected reservations
+    rejected_reservations = Reservation.query.filter_by(user_id=user.id, status='rejected').order_by(Reservation.date.desc()).all()
+    for reservation in rejected_reservations:
+        flash(f"Your reservation for {reservation.laboratory_unit} on {reservation.date.strftime('%Y-%m-%d')} at {reservation.time} was rejected.", 'warning')
+    
     active_announcements = Announcement.query.filter_by(is_active=True).order_by(Announcement.created_at.desc()).all()
-    return render_template('home.html', user=user, announcements=active_announcements)
+    labs = [
+        'Laboratory 517', 'Laboratory 524', 'Laboratory 526',
+        'Laboratory 528', 'Laboratory 530', 'Laboratory 542', 'Laboratory 544'
+    ]
+    today = date.today().strftime('%Y-%m-%d')
+    return render_template('home.html', user=user, announcements=active_announcements, labs=labs, today=today)
 
 @app.route('/user/session-history')
 @login_required
 def user_session_history():
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user:
         flash('User not found', 'error')
         return redirect(url_for('home'))
@@ -148,13 +158,18 @@ def user_session_history():
 
 @app.route('/admin')
 def admin_dashboard():
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
+    
+    # Notify admin if there are new pending reservations
+    pending_count = Reservation.query.filter_by(status='pending').count()
+    if pending_count > 0:
+        flash(f'There are {pending_count} pending reservation(s) awaiting your approval.', 'info')
     
     # Get statistics for admin dashboard
     total_users = User.query.filter_by(is_admin=False).count()  # Exclude admin users from count
@@ -162,16 +177,34 @@ def admin_dashboard():
     total_reservations = Reservation.query.count()
     completed_sessions = Session.query.filter_by(status='completed').count()  # Add completed sessions count
     
-    # Get purpose statistics for the chart
-    purpose_stats = db.session.query(
-        Session.purpose,
-        db.func.count(Session.id).label('count')
-    ).filter(Session.status == 'completed').group_by(Session.purpose).all()
-    
-    # Convert to dictionary format for the chart
+    # Define the new purpose categories
+    purpose_categories = [
+        'C Programming',
+        'Java Programming',
+        'Python Programming',
+        'C# Programming',
+        'Database',
+        'Digital logic & Design',
+        'Embedded Systems & IOT',
+        'System Integration & Architecture',
+        'Computer Application',
+        'Project Management',
+        'IT Trends',
+        'Technopreneurship',
+        'Capstone Project'
+    ]
+    # Get all completed sessions
+    completed_sessions_qs = Session.query.filter_by(status='completed').all()
+    # Count by category
+    purpose_counts = {cat: 0 for cat in purpose_categories}
+    for lab_session in completed_sessions_qs:
+        if lab_session.purpose in purpose_categories:
+            purpose_counts[lab_session.purpose] += 1
+    # Remove categories with zero count
+    filtered_purpose_counts = {k: v for k, v in purpose_counts.items() if v > 0}
     purpose_data = {
-        'labels': [purpose for purpose, _ in purpose_stats],
-        'data': [count for _, count in purpose_stats]
+        'labels': list(filtered_purpose_counts.keys()),
+        'data': list(filtered_purpose_counts.values())
     }
     
     # Get announcements from database
@@ -201,7 +234,7 @@ def login():
     user = User.query.filter_by(id_number=id_number).first()
     
     if user and check_password_hash(user.password, password):
-        session['user_id'] = user.id_number
+        flask_session['user_id'] = user.id_number
         flash('Login successful!', 'success')
         if user.is_admin:
             return redirect(url_for('admin_dashboard'))
@@ -212,23 +245,23 @@ def login():
 
 @app.route('/logout')
 def logout():
-    session.pop('user_id', None)
+    flask_session.pop('user_id', None)
     flash('Logged out successfully', 'success')
     return redirect(url_for('index'))
 
 @app.route('/profile', methods=['GET', 'POST'])
 def profile():
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     
     if request.method == 'POST':
         # Handle file upload
         if 'profile_image' in request.files:
             file = request.files['profile_image']
             if file and file.filename and allowed_file(file.filename, 'image'):
-                filename = secure_filename(f"{session['user_id']}_{file.filename}")
+                filename = secure_filename(f"{flask_session['user_id']}_{file.filename}")
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                 user.profile_image = filename
         
@@ -319,10 +352,10 @@ def create_admin():
 
 @app.route('/submit_feedback', methods=['POST'])
 def submit_feedback():
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user:
         flash('User not found', 'error')
         return redirect(url_for('home'))
@@ -330,6 +363,7 @@ def submit_feedback():
     try:
         rating = request.form.get('rating')
         feedback_text = request.form.get('feedback_text')
+        session_id = request.form.get('session_id')
         
         if not rating or not feedback_text:
             flash('Please fill in all fields', 'error')
@@ -340,7 +374,8 @@ def submit_feedback():
             user_id=user.id,
             rating=int(rating),
             feedback_text=feedback_text,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
+            session_id=session_id if session_id else None
         )
         
         db.session.add(new_feedback)
@@ -356,10 +391,10 @@ def submit_feedback():
 
 @app.route('/admin/feedback')
 def admin_feedback():
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
@@ -371,10 +406,10 @@ def admin_feedback():
 
 @app.route('/admin/feedback/<int:feedback_id>/mark-read', methods=['POST'])
 def mark_feedback_read(feedback_id):
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
@@ -404,10 +439,10 @@ def delete_feedback(feedback_id):
 
 @app.route('/admin/announcements', methods=['GET', 'POST'])
 def admin_announcements():
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
@@ -442,10 +477,10 @@ def admin_announcements():
 
 @app.route('/admin/announcements/<int:id>/edit', methods=['GET', 'POST'])
 def edit_announcement(id):
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
@@ -487,10 +522,10 @@ def edit_announcement(id):
 
 @app.route('/admin/announcements/<int:id>/delete', methods=['POST'])
 def delete_announcement(id):
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
@@ -509,10 +544,10 @@ def delete_announcement(id):
 
 @app.route('/admin/announcements/<int:id>/toggle', methods=['POST'])
 def toggle_announcement(id):
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
@@ -532,10 +567,10 @@ def toggle_announcement(id):
 
 @app.route('/admin/users/<int:user_id>/toggle', methods=['POST'])
 def toggle_user_status(user_id):
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    admin = User.query.filter_by(id_number=session['user_id']).first()
+    admin = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not admin or not admin.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
@@ -555,10 +590,10 @@ def toggle_user_status(user_id):
 
 @app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
 def delete_user(user_id):
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    admin = User.query.filter_by(id_number=session['user_id']).first()
+    admin = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not admin or not admin.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
@@ -581,6 +616,26 @@ def delete_user(user_id):
 def admin_users():
     users = User.query.filter_by(is_admin=False).order_by(User.last_name).all()
     return render_template('admin_users.html', users=users)
+
+@app.route('/admin/users/search/<id_number>')
+@login_required
+@admin_required
+def admin_search_user(id_number):
+    user = User.query.filter_by(id_number=id_number).first()
+    if user and not user.is_admin:
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'id_number': user.id_number,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'course': user.course,
+                'year_level': user.year_level
+            }
+        })
+    else:
+        return jsonify({'success': False, 'message': 'Student not found.'})
 
 class LabResource(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -699,7 +754,7 @@ def user_resources():
 @app.route('/reservations')
 @login_required
 def user_reservations():
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     reservations = Reservation.query.filter_by(user_id=user.id).order_by(Reservation.date.desc(), Reservation.time.desc()).all()
     return render_template('user_reservations.html', reservations=reservations)
 
@@ -727,31 +782,36 @@ def get_available_pcs(laboratory):
 @app.route('/submit_reservation', methods=['POST'])
 @login_required
 def submit_reservation():
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user:
         flash('User not found', 'error')
         return redirect(url_for('home'))
     
     try:
-        date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
-        time = datetime.strptime(request.form.get('time'), '%H:%M').time()
+        date_val = request.form.get('date')
+        time_val = request.form.get('time')
         purpose = request.form.get('purpose')
         laboratory_unit = request.form.get('laboratory_unit')
-        pc_id = request.form.get('pc_number')
-        
+        pc_id = request.form.get('computer_id')
+        print('DEBUG FORM VALUES:', date_val, time_val, purpose, laboratory_unit, pc_id)
+        date = datetime.strptime(date_val, '%Y-%m-%d').date() if date_val else None
+        # FIX: Extract start time from '8:00-9:00' format
+        start_time_str = time_val.split('-')[0] if time_val else None
+        time = datetime.strptime(start_time_str.strip(), '%H:%M').time() if start_time_str else None
         if not all([date, time, purpose, laboratory_unit, pc_id]):
             flash('Please fill in all fields', 'error')
+            print('DEBUG: Missing field(s)')
             return redirect(url_for('home'))
-        
         # Check if the selected PC is available
         computer = Computer.query.get(pc_id)
+        print('DEBUG: Computer object:', computer)
         if not computer or computer.status != 'vacant':
             flash('The selected PC is not available', 'error')
+            print('DEBUG: PC not available or not found')
             return redirect(url_for('home'))
-        
         # Check for existing reservations at the same time
         existing_reservation = Reservation.query.filter_by(
             date=date,
@@ -759,11 +819,10 @@ def submit_reservation():
             laboratory_unit=laboratory_unit,
             status='approved'
         ).first()
-        
         if existing_reservation:
             flash('This time slot is already reserved', 'error')
+            print('DEBUG: Existing reservation found')
             return redirect(url_for('home'))
-        
         # Create new reservation
         new_reservation = Reservation(
             user_id=user.id,
@@ -771,12 +830,10 @@ def submit_reservation():
             time=time,
             purpose=purpose,
             laboratory_unit=laboratory_unit,
-            computer_id=pc_id  # Add the computer_id to the reservation
+            computer_id=pc_id
         )
-        
         # Update computer status to reserved
         computer.status = 'reserved'
-        
         try:
             db.session.add(new_reservation)
             db.session.commit()
@@ -785,8 +842,11 @@ def submit_reservation():
             db.session.rollback()
             flash('An error occurred while submitting reservation', 'error')
             print(f"Error submitting reservation: {str(e)}")
-        
-        return redirect(url_for('home'))
+        # Redirect to admin reservations if admin, else home
+        if user.is_admin:
+            return redirect(url_for('admin_reservations'))
+        else:
+            return redirect(url_for('home'))
     except Exception as e:
         flash('An error occurred while submitting reservation', 'error')
         print(f"Error submitting reservation: {str(e)}")
@@ -796,17 +856,19 @@ def submit_reservation():
 @login_required
 @admin_required
 def admin_reservations():
-    # Get all reservations with user information, ordered by date and time, excluding completed ones
-    reservations = Reservation.query.join(User).filter(Reservation.status != 'completed').order_by(Reservation.date.desc(), Reservation.time.desc()).all()
-    
+    # Get all reservations with user information, ordered by date and time, only pending and approved
+    reservations = Reservation.query.join(User).filter(Reservation.status.in_(['pending', 'approved'])).order_by(Reservation.date.desc(), Reservation.time.desc()).all()
     # Calculate statistics
     stats = {
-        'total': Reservation.query.filter(Reservation.status != 'completed').count(),
+        'total': Reservation.query.filter(Reservation.status.in_(['pending', 'approved'])).count(),
         'active': Reservation.query.filter_by(status='approved').count(),
         'pending': Reservation.query.filter_by(status='pending').count()
     }
-    
-    return render_template('admin_reservations.html', reservations=reservations, stats=stats)
+    # Pass the lab schedule for template use
+    schedule = None
+    if 'get_lab_schedule' in globals():
+        schedule = get_lab_schedule()
+    return render_template('admin_reservations.html', reservations=reservations, stats=stats, schedule=schedule)
 
 @app.route('/admin/reservations/<int:reservation_id>/status', methods=['POST'])
 @login_required
@@ -829,19 +891,46 @@ def update_reservation_status(reservation_id):
                 Reservation.status == 'approved',
                 Reservation.id != reservation.id
             ).first()
-            
             if existing_reservation:
                 return jsonify({
                     'success': False, 
                     'message': 'This time slot is already reserved by another user'
                 }), 409
-        
-        reservation.status = new_status
-        db.session.commit()
-        return jsonify({
-            'success': True,
-            'message': f'Reservation {new_status} successfully!'
-        })
+            # --- Automatically start session for student ---
+            user = User.query.get(reservation.user_id)
+            computer = Computer.query.get(reservation.computer_id)
+            if not computer:
+                return jsonify({'success': False, 'message': 'Computer not found'}), 404
+            if computer.status not in ['vacant', 'reserved']:
+                return jsonify({'success': False, 'message': 'Computer is not available'}), 400
+            if computer.status == 'reserved':
+                # Only block if reserved by another user
+                active_reservation = Reservation.query.filter_by(
+                    computer_id=computer.id,
+                    status='approved'
+                ).first()
+                if active_reservation and active_reservation.user_id != user.id and reservation.id != active_reservation.id:
+                    return jsonify({'success': False, 'message': 'Computer is reserved by another user'}), 400
+            if user.remaining_sessions <= 0:
+                return jsonify({'success': False, 'message': 'User has no remaining sessions'}), 400
+            session_obj = Session(
+                user_id=reservation.user_id,
+                purpose=reservation.purpose,
+                laboratory_unit=reservation.laboratory_unit,
+                computer_id=reservation.computer_id,
+                start_time=datetime.utcnow()
+            )
+            computer.status = 'occupied'
+            user.remaining_sessions -= 1
+            db.session.add(session_obj)
+            db.session.delete(reservation)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Reservation approved and session started for student!'})
+        else:
+            # If rejected, mark as rejected instead of deleting
+            reservation.status = 'rejected'
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Reservation rejected.'})
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -868,7 +957,7 @@ def delete_reservation(reservation_id):
 @app.route('/admin/sessions', methods=['GET'])
 @login_required
 def admin_sessions():
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Access denied. Admin privileges required.', 'error')
         return redirect(url_for('home'))
@@ -892,43 +981,52 @@ def admin_sessions():
 @app.route('/admin/sessions/start', methods=['POST'])
 @login_required
 def start_session():
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         return jsonify({'error': 'Access denied. Admin privileges required.'}), 403
-    
+
     data = request.get_json()
     id_number = data.get('id_number')
     purpose = data.get('purpose')
     laboratory_unit = data.get('laboratory_unit')
-    
-    if not all([id_number, purpose, laboratory_unit]):
+    pc_id = data.get('pc_id')
+
+    if not all([id_number, purpose, laboratory_unit, pc_id]):
         return jsonify({'error': 'Missing required fields'}), 400
-    
+
     # Find user by ID number
-    user = User.query.filter_by(id_number=id_number).first()
-    if not user:
+    student = User.query.filter_by(id_number=id_number).first()
+    if not student:
         return jsonify({'error': 'User not found'}), 404
-    
+
     # Check if user has remaining sessions
-    if user.remaining_sessions <= 0:
+    if student.remaining_sessions <= 0:
         return jsonify({'error': 'User has no remaining sessions'}), 400
-    
+
+    # Check if the selected PC is available
+    computer = Computer.query.get(pc_id)
+    if not computer or computer.status != 'vacant':
+        return jsonify({'error': 'The selected PC is not available'}), 400
+
     # Create new session
-    session = Session(
-        user_id=user.id,
+    session_obj = Session(
+        user_id=student.id,
         purpose=purpose,
-        laboratory_unit=laboratory_unit
+        laboratory_unit=laboratory_unit,
+        computer_id=pc_id
     )
-    
+
     try:
         # Decrement remaining sessions
-        user.remaining_sessions -= 1
-        db.session.add(session)
+        student.remaining_sessions -= 1
+        # Set computer to occupied
+        computer.status = 'occupied'
+        db.session.add(session_obj)
         db.session.commit()
         return jsonify({
             'message': 'Session started successfully',
-            'session': session.to_dict(),
-            'remaining_sessions': user.remaining_sessions
+            'session': session_obj.to_dict(),
+            'remaining_sessions': student.remaining_sessions
         }), 201
     except Exception as e:
         db.session.rollback()
@@ -937,26 +1035,40 @@ def start_session():
 @app.route('/admin/sessions/<int:session_id>/end', methods=['POST'])
 @login_required
 def end_session(session_id):
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         return jsonify({'error': 'Access denied. Admin privileges required.'}), 403
-    
+
     lab_session = Session.query.get_or_404(session_id)
-    
+
     if lab_session.status == 'completed':
         return jsonify({'error': 'Session already completed'}), 400
-    
+
     try:
         # Get the computer associated with the session
         computer = Computer.query.get(lab_session.computer_id)
         if computer:
             # Update computer status back to vacant
             computer.status = 'vacant'
-        
+        # Check if awarding a point
+        award_point = False
+        if request.is_json:
+            data = request.get_json()
+            award_point = data.get('award_point', False)
+        elif 'award_point' in request.form:
+            award_point = request.form.get('award_point') == 'true'
         lab_session.status = 'completed'
         lab_session.end_time = datetime.utcnow()
+        # Award a point if requested
+        if award_point:
+            student = User.query.get(lab_session.user_id)
+            if student:
+                student.points += 1
         db.session.commit()
-        return jsonify({'message': 'Session ended successfully'}), 200
+        msg = 'Session ended successfully'
+        if award_point:
+            msg += ' and point awarded'
+        return jsonify({'message': msg}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -964,7 +1076,7 @@ def end_session(session_id):
 @app.route('/admin/sessions/<int:session_id>', methods=['DELETE'])
 @login_required
 def delete_session(session_id):
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         return jsonify({'error': 'Access denied. Admin privileges required.'}), 403
     
@@ -1100,10 +1212,10 @@ def reset_user_sessions(user_id):
 
 @app.route('/admin/reports')
 def admin_reports():
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
@@ -1114,33 +1226,99 @@ def admin_reports():
 @login_required
 @admin_required
 def export_report(report_type, format_type):
-    if 'user_id' not in session:
+    if 'user_id' not in flask_session:
         return redirect(url_for('index'))
     
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         flash('Unauthorized access', 'error')
         return redirect(url_for('home'))
     
     start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d')
     end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d')
+    lab_room = request.form.get('lab_room')
+    purpose = request.form.get('purpose')
     
-    # Get data based on report type
+    # Get data based on report type, with filters
     if report_type == 'user_activity':
-        data = get_user_activity_data(start_date, end_date)
+        query = Session.query.filter(
+            Session.start_time >= start_date,
+            Session.end_time <= end_date
+        )
+        if lab_room:
+            query = query.filter(Session.laboratory_unit == lab_room)
+        if purpose:
+            query = query.filter(Session.purpose == purpose)
+        sessions = query.all()
+        data = []
+        for session in sessions:
+            data.append({
+                'user_id': session.user.id_number,
+                'name': f"{session.user.first_name} {session.user.last_name}",
+                'purpose': session.purpose,
+                'start_time': session.start_time.strftime('%Y-%m-%d %H:%M'),
+                'end_time': session.end_time.strftime('%Y-%m-%d %H:%M') if session.end_time else 'Ongoing',
+                'status': session.status
+            })
         title = "User Activity Report"
-       
+    
     elif report_type == 'lab_usage':
-        data = get_lab_usage_data(start_date, end_date)
+        query = Session.query.filter(
+            Session.start_time >= start_date,
+            Session.end_time <= end_date
+        )
+        if lab_room:
+            query = query.filter(Session.laboratory_unit == lab_room)
+        if purpose:
+            query = query.filter(Session.purpose == purpose)
+        sessions = query.all()
+        data = []
+        for session in sessions:
+            data.append({
+                'laboratory_unit': session.laboratory_unit,
+                'purpose': session.purpose,
+                'start_time': session.start_time.strftime('%Y-%m-%d %H:%M'),
+                'end_time': session.end_time.strftime('%Y-%m-%d %H:%M') if session.end_time else 'Ongoing',
+                'status': session.status,
+                'user': f"{session.user.first_name} {session.user.last_name}"
+            })
         title = "Laboratory Usage Report"
         description = "This report shows the laboratory usage in the system during the selected date range."
     elif report_type == 'statistics':
-        data = get_statistics_data(start_date, end_date)
+        query = Session.query.filter(
+            Session.start_time >= start_date,
+            Session.end_time <= end_date
+        )
+        if lab_room:
+            query = query.filter(Session.laboratory_unit == lab_room)
+        if purpose:
+            query = query.filter(Session.purpose == purpose)
+        total_sessions = query.count()
+        active_sessions = query.filter(Session.status == 'active').count()
+        completed_sessions = query.filter(Session.status == 'completed').count()
+        purpose_stats = db.session.query(
+            Session.purpose,
+            db.func.count(Session.id).label('count')
+        ).filter(
+            Session.start_time >= start_date,
+            Session.end_time <= end_date
+        )
+        if lab_room:
+            purpose_stats = purpose_stats.filter(Session.laboratory_unit == lab_room)
+        if purpose:
+            purpose_stats = purpose_stats.filter(Session.purpose == purpose)
+        purpose_stats = purpose_stats.group_by(Session.purpose).all()
+        data = {
+            'total_sessions': total_sessions,
+            'active_sessions': active_sessions,
+            'completed_sessions': completed_sessions,
+            'purpose_stats': [(purpose, count) for purpose, count in purpose_stats]
+        }
         title = "Statistics Report"
         description = "This report shows the statistics of the system during the selected date range."
     else:
         flash('Invalid report type', 'error')
-        return redirect(url_for('admin_reports'))
+        return redirect(url_for('session_history'))
     
     # Generate report in requested format
     if format_type == 'pdf':
@@ -1151,7 +1329,7 @@ def export_report(report_type, format_type):
         return generate_xml_report(data, title)
     else:
         flash('Invalid format type', 'error')
-        return redirect(url_for('admin_reports'))
+        return redirect(url_for('session_history'))
 
 def get_user_activity_data(start_date, end_date):
     # Get user activity data from database
@@ -1234,10 +1412,14 @@ def generate_pdf_report(data, title):
     elements.append(Paragraph(title, styles['Title']))
     elements.append(Spacer(1, 12))
     # Table data
-    if isinstance(data, list) and data:
-        table_data = [list(data[0].keys())]
-        for row in data:
-            table_data.append(list(row.values()))
+    if isinstance(data, list):
+        if data:
+            table_data = [list(data[0].keys())]
+            for row in data:
+                table_data.append(list(row.values()))
+        else:
+            # If no data, show headers and a 'No data' row
+            table_data = [['No data available']]
         table = Table(table_data, repeatRows=1)
         style = TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
@@ -1364,13 +1546,13 @@ def generate_xml_report(data, title):
 def admin_computers():
     # Predefined laboratory units with specific room numbers
     laboratories = [
-        'Laboratory 524 - Programming Lab',
-        'Laboratory 526 - Networking Lab',
-        'Laboratory 528 - Hardware Lab',
-        'Laboratory 530 - Multimedia Lab',
-        'Laboratory 542 - Research Lab',
-        'Laboratory 544 - Project Lab',
-        'Laboratory 517 - Special Lab'
+        'Laboratory 524',
+        'Laboratory 526',
+        'Laboratory 528',
+        'Laboratory 530',
+        'Laboratory 542',
+        'Laboratory 544',
+        'Laboratory 517'
     ]
     
     # Get computers for each laboratory
@@ -1524,7 +1706,7 @@ def leaderboard():
 @app.route('/user/activity-history')
 @login_required
 def user_activity_history():
-    user = User.query.filter_by(id_number=session['user_id']).first()
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user:
         flash('User not found', 'error')
         return redirect(url_for('home'))
@@ -1735,6 +1917,187 @@ def export_lab_schedule(format_type):
         )
     else:
         return 'Invalid format', 400
+
+@app.route('/admin/daily-sitin-record')
+@login_required
+@admin_required
+def daily_sitin_record():
+    today = date.today()
+    start = datetime.combine(today, datetime.min.time())
+    end = datetime.combine(today, datetime.max.time())
+    sessions = Session.query.filter(
+        Session.status == 'completed',
+        Session.end_time >= start,
+        Session.end_time <= end
+    ).order_by(Session.end_time.desc()).all()
+    # Serialize only the fields needed for the pie chart
+    sessions_json = [{"purpose": s.purpose} for s in sessions]
+    return render_template('daily_sitin_record.html', sessions=sessions, sessions_json=sessions_json)
+
+@app.route('/admin/computers/set_all_status', methods=['POST'])
+@login_required
+@admin_required
+def set_all_computer_status():
+    data = request.get_json()
+    status = data.get('status')
+    if status not in ['vacant', 'occupied']:
+        return jsonify({'success': False, 'message': 'Invalid status'}), 400
+    try:
+        Computer.query.update({Computer.status: status})
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'All PCs set to {status}.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
+
+def is_lab_available(lab_number, date, time):
+    """Check if a lab is available at the given date and time."""
+    # Convert date to day of week
+    day = date.strftime('%A')
+    
+    # Get the lab schedule
+    schedule = get_lab_schedule()
+    
+    # Check if the lab is scheduled for a class at this time
+    if lab_number in schedule and day in schedule[lab_number]:
+        if time in schedule[lab_number][day]:
+            slot = schedule[lab_number][day][time]
+            if slot and slot.get('course'):
+                return False
+    
+    return True
+
+@app.route('/create_sit_in', methods=['POST'])
+@login_required
+def create_sit_in():
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
+    if not user or not user.is_admin:
+        flash('Unauthorized access', 'error')
+        return redirect(url_for('home'))
+    
+    student_id = request.form.get('student_id')
+    lab_number = request.form.get('lab_number')
+    pc_number = request.form.get('pc_number')
+    purpose = request.form.get('purpose')
+    
+    # Get current date and time
+    now = datetime.now()
+    current_time = now.strftime('%I:%M %p')
+    
+    # Check if lab is available
+    if not is_lab_available(lab_number, now, current_time):
+        flash('Lab is currently scheduled for a class', 'error')
+        return redirect(url_for('admin_dashboard'))
+    
+    # Create new session
+    session = Session(
+        student_id=student_id,
+        lab_number=lab_number,
+        pc_number=pc_number,
+        purpose=purpose,
+        start_time=now
+    )
+    
+    db.session.add(session)
+    db.session.commit()
+    
+    flash('Sit-in session created successfully', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/reserve', methods=['POST'])
+@login_required
+def reserve():
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
+    lab_number = request.form.get('lab_number')
+    pc_number = request.form.get('pc_number')
+    date = request.form.get('date')
+    time = request.form.get('time')
+    
+    # Convert date string to datetime object
+    reservation_date = datetime.strptime(date, '%Y-%m-%d')
+    
+    # Check if lab is available
+    if not is_lab_available(lab_number, reservation_date, time):
+        flash('Lab is scheduled for a class at the selected time', 'error')
+        return redirect(url_for('home'))
+    
+    # Create new reservation
+    reservation = Reservation(
+        student_id=user.id,
+        lab_number=lab_number,
+        pc_number=pc_number,
+        date=reservation_date,
+        time=time,
+        status='pending'
+    )
+    
+    db.session.add(reservation)
+    db.session.commit()
+    
+    flash('Reservation request submitted successfully', 'success')
+    return redirect(url_for('home'))
+
+@app.route('/check_lab_availability')
+@login_required
+def check_lab_availability():
+    lab = request.args.get('lab')
+    date_str = request.args.get('date')
+    time = request.args.get('time')
+    
+    if not all([lab, date_str, time]):
+        return jsonify({'error': 'Missing parameters'}), 400
+    
+    try:
+        date = datetime.strptime(date_str, '%Y-%m-%d')
+        available = is_lab_available(lab, date, time)
+        return jsonify({'available': available})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/get_available_times')
+@login_required
+def get_available_times():
+    lab = request.args.get('laboratory')
+    computer_id = request.args.get('computer_id')
+    date_str = request.args.get('date')
+    if not all([lab, computer_id, date_str]):
+        return jsonify({'success': False, 'message': 'Missing parameters'}), 400
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+        # Define all possible time slots (should match your system)
+        times = [
+            '7:00-8:00', '8:00-9:00', '9:00-10:00', '10:00-11:00',
+            '11:00-12:00', '12:00-1:00', '1:00-2:00', '2:00-3:00', '3:00-4:00'
+        ]
+        # Get reservations for this lab, PC, and date
+        reserved_times = set(
+            r.time.strftime('%H:%M') if hasattr(r.time, 'strftime') else str(r.time)
+            for r in Reservation.query.filter_by(laboratory_unit=lab, computer_id=computer_id, date=date_obj).all()
+        )
+        # Get scheduled classes for this lab and date (day of week)
+        day = date_obj.strftime('%A')
+        scheduled_times = set()
+        schedule = get_lab_schedule() if 'get_lab_schedule' in globals() else None
+        if schedule and lab in schedule and day in schedule[lab]:
+            for t in times:
+                slot = schedule[lab][day][t]
+                if slot and slot.get('course'):
+                    scheduled_times.add(t)
+        # Only return times not reserved and not scheduled
+        available_times = [t for t in times if t not in reserved_times and t not in scheduled_times]
+        return jsonify({'success': True, 'times': available_times})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+# Add this function near the top, after SCHEDULE_DATA is defined
+
+def get_lab_schedule():
+    global SCHEDULE_DATA
+    return SCHEDULE_DATA
+
+# Replace all current_user references with session-based user lookup
+# Example: Replace 'current_user.id' with 'user.id' where user is fetched from session
+# (No code output for replacements, as this is a comment for the edit model)
 
 if __name__ == '__main__':
     init_db()  # Initialize database and create admin user

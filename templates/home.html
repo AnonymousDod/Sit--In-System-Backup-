@@ -735,78 +735,67 @@
     </div>
 
     <!-- Reservation Modal -->
-    <div id="reservationModal" class="modal-overlay">
-        <div class="modal-content">
+    <div id="reservationModal" class="modal-overlay" style="display:none; align-items:center; justify-content:center;">
+        <div class="modal-content" style="max-width: 500px; margin: 2rem auto; padding: 2.5rem 2rem; border-radius: 12px; box-shadow: 0 8px 32px rgba(30,64,175,0.15); position: relative;">
             <button class="close-button" onclick="closeReservationModal()">&times;</button>
             <div id="reservationSection">
-                <div class="welcome-card">
-                    <h3 class="mb-4">
+                <div class="welcome-card" style="box-shadow:none; padding:0;">
+                    <h3 class="mb-4 d-flex align-items-center" style="font-size:1.5rem;">
                         <i class="bi bi-calendar-plus me-2"></i>
                         Make a Reservation
                     </h3>
-                    <form id="reservationForm" class="reservation-form" action="{{ url_for('submit_reservation') }}" method="POST">
-                        <div class="form-row">
+                    <form method="POST" action="{{ url_for('submit_reservation') }}" id="reservationForm" class="reservation-form">
+                        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
                             <div class="form-group">
-                                <label for="reservationDate">Date</label>
-                                <input type="date" id="reservationDate" name="date" required 
-                                       min="{{ today_date }}" class="form-control">
+                                <label for="laboratory_unit">Laboratory:</label>
+                                <select name="laboratory_unit" id="laboratory_unit" class="form-control" required>
+                                    <option value="" disabled selected>Select Lab</option>
+                                    {% for lab in labs %}
+                                        <option value="{{ lab }}">{{ lab }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="form-group">
-                                <label for="reservationTime">Time</label>
-                                <input type="time" id="reservationTime" name="time" required 
-                                       class="form-control" min="07:00" max="21:00"
-                                       onchange="validateTime()">
-                                <small class="form-text text-muted">Laboratory hours: 7:00 AM - 9:00 PM</small>
+                                <label for="computer_id">PC Number:</label>
+                                <select name="computer_id" id="computer_id" class="form-control" required>
+                                    <option value="" disabled selected>Select PC</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                            <div class="form-group">
+                                <label for="date">Date:</label>
+                                <input type="date" name="date" id="date" class="form-control" required min="{{ today }}">
                             </div>
                             <div class="form-group">
-                                <label for="reservationType">Reservation Type</label>
-                                <select id="reservationType" name="reservation_type" required class="form-control">
-                                    <option value="regular">Regular Reservation</option>
-                                    <option value="sit_in">Sit-in</option>
+                                <label for="time">Time:</label>
+                                <select name="time" id="time" class="form-control" required>
+                                    <option value="" disabled selected>Select Time</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="reservationPurpose">Purpose</label>
-                            <select id="reservationPurpose" name="purpose" required class="form-control">
-                                <option value="">Select a purpose</option>
-                                <option value="assignment">C Programming</option>
-                                <option value="project">Java Programming</option>
-                                <option value="research">Python Programming</option>
-                                <option value="practice">C# Programming</option>
-                                <option value="other">Database</option>
-                                <option value="other">Digital logic & Design</option>
-                                <option value="other">Embedded Systems & IOT</option>
-                                <option value="other">System Integration & Architecture</option>
-                                <option value="other">Computer Application</option>
-                                <option value="other">Project Management</option>
-                                <option value="other">IT Trends</option>
-                                <option value="other">Technopreneurship</option>
-                                <option value="other">Capstone Project</option>
+                            <label for="purpose">Purpose:</label>
+                            <select name="purpose" id="purpose" class="form-control" required>
+                                <option value="" disabled selected>Select Purpose</option>
+                                <option value="C Programming">C Programming</option>
+                                <option value="Java Programming">Java Programming</option>
+                                <option value="Python Programming">Python Programming</option>
+                                <option value="C# Programming">C# Programming</option>
+                                <option value="Database">Database</option>
+                                <option value="Digital logic & Design">Digital logic & Design</option>
+                                <option value="Embedded Systems & IOT">Embedded Systems & IOT</option>
+                                <option value="System Integration & Architecture">System Integration & Architecture</option>
+                                <option value="Computer Application">Computer Application</option>
+                                <option value="Project Management">Project Management</option>
+                                <option value="IT Trends">IT Trends</option>
+                                <option value="Technopreneurship">Technopreneurship</option>
+                                <option value="Capstone Project">Capstone Project</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="laboratoryUnit">Laboratory Unit</label>
-                            <select id="laboratoryUnit" name="laboratory_unit" required class="form-control" onchange="updateAvailablePCs()">
-                                <option value="">Select a laboratory unit</option>
-                                <option value="Laboratory 524 - Programming Lab">Laboratory 524 - Programming Lab</option>
-                                <option value="Laboratory 526 - Networking Lab">Laboratory 526 - Networking Lab</option>
-                                <option value="Laboratory 528 - Hardware Lab">Laboratory 528 - Hardware Lab</option>
-                                <option value="Laboratory 530 - Multimedia Lab">Laboratory 530 - Multimedia Lab</option>
-                                <option value="Laboratory 542 - Research Lab">Laboratory 542 - Research Lab</option>
-                                <option value="Laboratory 544 - Project Lab">Laboratory 544 - Project Lab</option>
-                                <option value="Laboratory 517 - Special Lab">Laboratory 517 - Special Lab</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="pcNumber">Select PC</label>
-                            <select id="pcNumber" name="pc_number" required class="form-control">
-                                <option value="">Select a laboratory first</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="submit-btn">
-                            <i class="bi bi-check-circle me-2"></i>
-                            Submit Reservation
+                        <div id="availabilityStatus" class="alert" style="display: none;"></div>
+                        <button type="submit" class="submit-btn" style="width:100%; margin-top:1rem; background:#667eea; color:white; border:none; border-radius:5px; font-size:1rem; padding:1rem; display:flex; align-items:center; justify-content:center; gap:0.5rem;">
+                            <i class="bi bi-check-circle me-2"></i>Submit Reservation
                         </button>
                     </form>
                 </div>
@@ -899,7 +888,7 @@
                     
                     // Validate all required fields
                     // Validate time
-                    const timeInput = document.getElementById('reservationTime');
+                    const timeInput = document.getElementById('time');
                     if (!timeInput.value) {
                         alert('Please select a time');
                         return;
@@ -915,11 +904,78 @@
             }
 
             // Set minimum date to today
-            const dateInput = document.getElementById('reservationDate');
+            const dateInput = document.getElementById('date');
             if (dateInput) {
                 const today = new Date().toISOString().split('T')[0];
                 dateInput.setAttribute('min', today);
             }
+
+            const labSelect = document.getElementById('laboratory_unit');
+            const pcSelect = document.getElementById('computer_id');
+            const timeSelect = document.getElementById('time');
+            const availabilityStatus = document.getElementById('availabilityStatus');
+            
+            // Load available PCs when lab changes
+            labSelect.addEventListener('change', function() {
+                const lab = labSelect.value;
+                pcSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+                fetch(`/get_available_pcs/${encodeURIComponent(lab)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        pcSelect.innerHTML = '<option value="" disabled selected>Select PC</option>';
+                        if (data.success && data.pcs.length > 0) {
+                            data.pcs.forEach(pc => {
+                                const option = document.createElement('option');
+                                option.value = pc.id;
+                                option.textContent = pc.computer_number;
+                                pcSelect.appendChild(option);
+                            });
+                        } else {
+                            const option = document.createElement('option');
+                            option.value = '';
+                            option.textContent = 'No PCs available';
+                            pcSelect.appendChild(option);
+                        }
+                        // Clear time options
+                        timeSelect.innerHTML = '<option value="" disabled selected>Select Time</option>';
+                    });
+            });
+
+            // Load available times when PC or date changes
+            function updateAvailableTimes() {
+                const lab = labSelect.value;
+                const pc = pcSelect.value;
+                const date = dateInput.value;
+                if (!lab || !pc || !date) {
+                    timeSelect.innerHTML = '<option value="" disabled selected>Select Time</option>';
+                    return;
+                }
+                timeSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+                fetch(`/get_available_times?laboratory=${encodeURIComponent(lab)}&computer_id=${encodeURIComponent(pc)}&date=${encodeURIComponent(date)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        timeSelect.innerHTML = '<option value="" disabled selected>Select Time</option>';
+                        if (data.success && data.times.length > 0) {
+                            data.times.forEach(time => {
+                                const option = document.createElement('option');
+                                option.value = time;
+                                option.textContent = time;
+                                timeSelect.appendChild(option);
+                            });
+                        } else {
+                            const option = document.createElement('option');
+                            option.value = '';
+                            option.textContent = 'No times available';
+                            timeSelect.appendChild(option);
+                        }
+                    });
+            }
+            pcSelect.addEventListener('change', updateAvailableTimes);
+            dateInput.addEventListener('change', updateAvailableTimes);
+            labSelect.addEventListener('change', function() {
+                // Clear time when lab changes
+                timeSelect.innerHTML = '<option value="" disabled selected>Select Time</option>';
+            });
         });
 
         function openRulesModal() {
@@ -940,7 +996,7 @@
         });
 
         function validateTime() {
-            const timeInput = document.getElementById('reservationTime');
+            const timeInput = document.getElementById('time');
             const selectedTime = timeInput.value;
             const [hours, minutes] = selectedTime.split(':').map(Number);
             const timeInMinutes = hours * 60 + minutes;
@@ -1043,60 +1099,6 @@
                     return;
                 }
             });
-        }
-
-        // Function to update available PCs based on selected laboratory
-        function updateAvailablePCs() {
-            const laboratorySelect = document.getElementById('laboratoryUnit');
-            const pcSelect = document.getElementById('pcNumber');
-            const selectedLab = laboratorySelect.value;
-
-            // Clear current options
-            pcSelect.innerHTML = '<option value="">Loading available PCs...</option>';
-
-            if (!selectedLab) {
-                pcSelect.innerHTML = '<option value="">Select a laboratory first</option>';
-                return;
-            }
-
-            // Fetch available PCs for the selected laboratory
-            fetch(`/get_available_pcs/${encodeURIComponent(selectedLab)}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (!data.success) {
-                        throw new Error(data.message || 'Error fetching PCs');
-                    }
-                    
-                    pcSelect.innerHTML = '';
-                    if (!data.pcs || data.pcs.length === 0) {
-                        pcSelect.innerHTML = '<option value="">No available PCs in this laboratory</option>';
-                        return;
-                    }
-
-                    // Add a default option
-                    const defaultOption = document.createElement('option');
-                    defaultOption.value = '';
-                    defaultOption.textContent = 'Select a PC';
-                    pcSelect.appendChild(defaultOption);
-
-                    // Add PC options
-                    data.pcs.forEach(pc => {
-                        const option = document.createElement('option');
-                        option.value = pc.id;
-                        option.textContent = `PC ${pc.computer_number} (${pc.status})`;
-                        option.disabled = pc.status !== 'vacant';
-                        pcSelect.appendChild(option);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error fetching PCs:', error);
-                    pcSelect.innerHTML = '<option value="">Error loading PCs. Please try again.</option>';
-                });
         }
     </script>
 </body>

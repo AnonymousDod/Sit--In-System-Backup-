@@ -54,6 +54,68 @@
     </nav>
 
     <div class="container mt-4">
+        <!-- Generate Reports UI -->
+        <div class="mb-4">
+            <div class="card p-3 shadow-sm">
+                <h5 class="mb-3"><i class="fas fa-file-export"></i> Export Reports</h5>
+                <form id="exportForm" method="post" class="row g-2 align-items-end">
+                    <div class="col-md-2">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" name="start_date" id="start_date" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" name="end_date" id="end_date" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="lab_room" class="form-label">Lab Room</label>
+                        <select class="form-select" name="lab_room" id="lab_room">
+                            <option value="">All</option>
+                            <option value="Laboratory 524">Laboratory 524</option>
+                            <option value="Laboratory 526">Laboratory 526</option>
+                            <option value="Laboratory 528">Laboratory 528</option>
+                            <option value="Laboratory 530">Laboratory 530</option>
+                            <option value="Laboratory 542">Laboratory 542</option>
+                            <option value="Laboratory 544">Laboratory 544</option>
+                            <option value="Laboratory 517">Laboratory 517</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="purpose" class="form-label">Purpose</label>
+                        <select class="form-select" name="purpose" id="purpose">
+                            <option value="">All</option>
+                            <option value="C Programming">C Programming</option>
+                            <option value="Java Programming">Java Programming</option>
+                            <option value="Python Programming">Python Programming</option>
+                            <option value="C# Programming">C# Programming</option>
+                            <option value="Database">Database</option>
+                            <option value="Digital logic & Design">Digital logic & Design</option>
+                            <option value="Embedded Systems & IOT">Embedded Systems & IOT</option>
+                            <option value="System Integration & Architecture">System Integration & Architecture</option>
+                            <option value="Computer Application">Computer Application</option>
+                            <option value="Project Management">Project Management</option>
+                            <option value="IT Trends">IT Trends</option>
+                            <option value="Technopreneurship">Technopreneurship</option>
+                            <option value="Capstone Project">Capstone Project</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="report_type" class="form-label">Report Type</label>
+                        <select class="form-select" name="report_type" id="report_type" required>
+                            <option value="user_activity">User Activity</option>
+                            <option value="lab_usage">Lab Usage</option>
+                            <option value="statistics">Statistics</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary w-100" name="format_type" value="pdf"><i class="fas fa-file-pdf"></i> PDF</button>
+                        <button type="submit" class="btn btn-success w-100" name="format_type" value="csv"><i class="fas fa-file-csv"></i> CSV</button>
+                        <button type="submit" class="btn btn-warning w-100" name="format_type" value="xml"><i class="fas fa-file-code"></i> XML</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -66,7 +128,7 @@
         {% endwith %}
 
         <div class="table-responsive">
-            <table class="table table-hover">
+            <table class="table table-hover" id="sessionTable">
                 <thead>
                     <tr>
                         <th>Student</th>
@@ -77,9 +139,9 @@
                         <th>Purpose</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="sessionTableBody">
                     {% for session in sessions %}
-                    <tr class="session-item">
+                    <tr class="session-item" data-lab="{{ session.laboratory_unit }}" data-purpose="{{ session.purpose }}">
                         <td>
                             {{ session.user.first_name }} {{ session.user.last_name }}<br>
                             <small class="text-muted">{{ session.user.id_number }}</small>
@@ -104,5 +166,51 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Set default dates to today for export form
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('start_date').value = today;
+            document.getElementById('end_date').value = today;
+        });
+        // Handle export form submission
+        document.getElementById('exportForm').addEventListener('submit', function(e) {
+            // Normalize date format to YYYY-MM-DD
+            const start = document.getElementById('start_date');
+            const end = document.getElementById('end_date');
+            // If the value contains '/', convert from MM/DD/YYYY to YYYY-MM-DD
+            if (start.value && start.value.includes('/')) {
+                const [month, day, year] = start.value.split('/');
+                start.value = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            if (end.value && end.value.includes('/')) {
+                const [month, day, year] = end.value.split('/');
+                end.value = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            const format = e.submitter.value;
+            this.action = `/admin/export/${document.getElementById('report_type').value}/${format}`;
+        });
+
+        // Table filtering logic
+        const labRoomSelect = document.getElementById('lab_room');
+        const purposeSelect = document.getElementById('purpose');
+        function filterTable() {
+            const lab = labRoomSelect.value;
+            const purpose = purposeSelect.value;
+            const rows = document.querySelectorAll('#sessionTableBody tr.session-item');
+            let anyVisible = false;
+            rows.forEach(row => {
+                const rowLab = row.getAttribute('data-lab');
+                const rowPurpose = row.getAttribute('data-purpose');
+                const show = (!lab || rowLab === lab) && (!purpose || rowPurpose === purpose);
+                row.style.display = show ? '' : 'none';
+                if (show) anyVisible = true;
+            });
+            // Show/hide 'no data' row
+            const noDataRow = document.querySelector('#sessionTableBody tr.no-data-row');
+            if (noDataRow) noDataRow.style.display = anyVisible ? 'none' : '';
+        }
+        labRoomSelect.addEventListener('change', filterTable);
+    </script>
 </body>
 </html> 

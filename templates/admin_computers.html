@@ -31,12 +31,35 @@
             background: #dc2626;
             color: white;
         }
-        .laboratory-section {
+        .top-controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
             margin-bottom: 2rem;
-            background: white;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            padding: 1.5rem;
+        }
+        .top-controls-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .top-controls-right {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        @media (max-width: 768px) {
+            .top-controls-row { flex-direction: column; align-items: stretch; }
+            .top-controls-left, .top-controls-right { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+        }
+        .laboratory-section {
+            margin-bottom: 2.5rem;
+            background: #fff;
+            border-radius: 1rem;
+            box-shadow: 0 2px 8px #0001;
+            padding: 2rem 2.5rem 1.5rem 2.5rem;
+            border: 1px solid #e5e7eb;
         }
         .laboratory-header {
             display: flex;
@@ -131,6 +154,24 @@
     </nav>
 
     <div class="container mt-4">
+        <div class="top-controls-row">
+            <div class="top-controls-left">
+                <label for="labRoomFilter" class="form-label mb-0">Select Lab Room:</label>
+                <select id="labRoomFilter" class="form-select d-inline-block w-auto">
+                    <option value="">All</option>
+                    {% for lab in laboratories %}
+                    <option value="{{ lab }}">{{ lab }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="top-controls-right">
+                <button class="btn btn-success" id="makeAllAvailable"><i class="fas fa-check-circle"></i> Make All PC Available</button>
+                <button class="btn btn-danger" id="makeAllOccupied"><i class="fas fa-times-circle"></i> Make All PC Occupied</button>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addComputerModal">
+                    <i class="fas fa-plus"></i> Add Computer
+                </button>
+            </div>
+        </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -142,17 +183,9 @@
             {% endif %}
         {% endwith %}
 
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <h2>Computer Control</h2>
-                <p class="text-muted">Manage computer status and availability in each laboratory</p>
-            </div>
-            <div class="col-md-6 text-end">
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addComputerModal">
-                    <i class="fas fa-plus"></i>
-                    Add Computer
-                </button>
-            </div>
+        <div class="mb-4">
+            <h2>Computer Control</h2>
+            <p class="text-muted">Manage computer status and availability in each laboratory</p>
         </div>
 
         <div class="row mb-4">
@@ -279,6 +312,48 @@
                 form.submit();
             }
         }
+
+        document.getElementById('makeAllAvailable').addEventListener('click', function() {
+            if (confirm('Are you sure you want to set ALL PCs to Available?')) {
+                fetch('/admin/computers/set_all_status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'vacant' })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    alert(data.message);
+                    window.location.reload();
+                });
+            }
+        });
+        document.getElementById('makeAllOccupied').addEventListener('click', function() {
+            if (confirm('Are you sure you want to set ALL PCs to Occupied?')) {
+                fetch('/admin/computers/set_all_status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'occupied' })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    alert(data.message);
+                    window.location.reload();
+                });
+            }
+        });
+
+        // Lab Room filter
+        document.getElementById('labRoomFilter').addEventListener('change', function() {
+            const selectedLab = this.value;
+            document.querySelectorAll('.laboratory-section').forEach(section => {
+                const title = section.querySelector('.laboratory-title').textContent.trim();
+                if (!selectedLab || title === selectedLab) {
+                    section.style.display = '';
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+        });
     </script>
 </body>
 </html> 

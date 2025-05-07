@@ -529,6 +529,116 @@
         .btn-secondary:hover {
             background: #d1d5db;
         }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content.sitin-modal-content {
+            background: #fff;
+            border-radius: 1rem;
+            box-shadow: 0 8px 32px rgba(30,64,175,0.15);
+            padding: 2rem 2.5rem 1.5rem 2.5rem;
+            max-width: 420px;
+            width: 100%;
+            position: relative;
+            animation: fadeInModal 0.3s;
+        }
+        @keyframes fadeInModal {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 2rem;
+            color: #64748b;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .close-button:hover { opacity: 1; color: #ef4444; }
+        #sitInModalBody label { font-weight: 500; margin-bottom: 0.25rem; }
+        #sitInModalBody .form-control, #sitInModalBody .form-select {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        #sitInModalBody .btn-success {
+            width: 100%;
+            font-size: 1.1rem;
+            padding: 0.75rem;
+        }
+        #sitInModalBody .student-info {
+            margin-bottom: 1.5rem;
+            background: #f8fafc;
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+        .sit-in-search-card {
+            background: #fff;
+            border-radius: 1rem;
+            box-shadow: 0 2px 8px #0002;
+            padding: 2rem 2.5rem 1.5rem 2.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .sit-in-search-form {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+            max-width: 400px;
+        }
+        .sit-in-search-form input[type="text"] {
+            flex: 1;
+            padding: 0.75rem 1.25rem 0.75rem 2.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid #cbd5e1;
+            font-size: 1.1rem;
+            background: #f8fafc url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/icons/search.svg') no-repeat 0.75rem center/1.2rem 1.2rem;
+            transition: border 0.2s, box-shadow 0.2s;
+        }
+        .sit-in-search-form input[type="text"]:focus {
+            border: 1.5px solid #1e40af;
+            outline: none;
+            box-shadow: 0 0 0 2px #1e40af22;
+        }
+        .sit-in-search-form button {
+            padding: 0.75rem 2rem;
+            border-radius: 0.5rem;
+            border: none;
+            background: #1e40af;
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: background 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 6px #1e40af22;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sit-in-search-form button:hover, .sit-in-search-form button:focus {
+            background: #2563eb;
+            box-shadow: 0 4px 12px #1e40af33;
+        }
+        @media (max-width: 600px) {
+            .sit-in-search-card { padding: 1rem; }
+            .sit-in-search-form { flex-direction: column; gap: 0.75rem; max-width: 100%; }
+            .sit-in-search-form button { width: 100%; justify-content: center; }
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -573,6 +683,22 @@
     </div>
 
     <main class="main-content">
+        <!-- Sit-in Search Bar -->
+        <div class="sit-in-search-card">
+            <form id="sitInSearchForm" class="sit-in-search-form">
+                <input type="text" id="sitInIdInput" placeholder="Enter Student ID Number" required autocomplete="off">
+                <button type="submit"><i class="fas fa-search"></i> Search</button>
+            </form>
+            <div id="sitInResult" class="mt-3 w-100"></div>
+        </div>
+        <!-- Sit-in Modal -->
+        <div id="sitInModalOverlay" class="modal-overlay" style="display:none;">
+            <div class="modal-content sitin-modal-content">
+                <button class="close-button" id="closeSitInModal">&times;</button>
+                <div id="sitInModalBody"></div>
+            </div>
+        </div>
+
         <div class="quick-actions">
             <div class="action-card" data-url="{{ url_for('admin_users') }}">
                 <div class="action-icon">
@@ -606,7 +732,7 @@
                     <i class="fas fa-clock"></i>
                 </div>
                 <div class="action-info">
-                    <div class="action-title">Active Sessions</div>
+                    <div class="action-title">Current Sit-in</div>
                     <div class="action-description">Monitor current laboratory sessions</div>
                 </div>
             </div>
@@ -615,17 +741,17 @@
                     <i class="fas fa-history"></i>
                 </div>
                 <div class="action-info">
-                    <div class="action-title">Session History</div>
+                    <div class="action-title">View Sit-in History</div>
                     <div class="action-description">View past laboratory activities</div>
                 </div>
             </div>
-            <div class="action-card" data-url="{{ url_for('admin_reports') }}">
+            <div class="action-card" data-url="{{ url_for('daily_sitin_record') }}">
                 <div class="action-icon">
-                    <i class="fas fa-chart-bar"></i>
+                    <i class="fas fa-calendar-day"></i>
                 </div>
                 <div class="action-info">
-                    <div class="action-title">Reports</div>
-                    <div class="action-description">Generate usage and activity reports</div>
+                    <div class="action-title">Daily Sit-in Record</div>
+                    <div class="action-description">View sessions ended today</div>
                 </div>
             </div>
             <div class="action-card" data-url="{{ url_for('admin_computers') }}">
@@ -633,7 +759,7 @@
                     <i class="fas fa-building"></i>
                 </div>
                 <div class="action-info">
-                    <div class="action-title">Laboratory Assign</div>
+                    <div class="action-title">Computer Controller</div>
                     <div class="action-description">Manage laboratory assignments and view available computers</div>
                 </div>
             </div>
@@ -662,15 +788,6 @@
                 <div class="action-info">
                     <h3>Leaderboard</h3>
                     <p>View top performing students</p>
-                </div>
-            </div>
-            <div class="action-card" id="addPointsCard" data-url="{{ url_for('add_points') }}">
-                <div class="action-icon">
-                    <i class="fas fa-star"></i>
-                </div>
-                <div class="action-info">
-                    <h3>Add Points</h3>
-                    <p>Reward students with points</p>
                 </div>
             </div>
             <div class="action-card" data-url="{{ url_for('admin_lab_schedule') }}">
@@ -833,6 +950,138 @@
         };
 
         new Chart(document.getElementById('purposeChart'), purposeConfig);
+
+        // Sit-in Search and Modal
+        const sitInFormHtml = (user, purposes, labs) => `
+            <div class='student-info'>
+                <div class='mb-1'><strong>Name:</strong> ${user.first_name} ${user.last_name}</div>
+                <div><strong>Course:</strong> ${user.course}</div>
+            </div>
+            <form id='sitInCreateForm'>
+                <div class='mb-2'>
+                    <label for='sitInPurpose'>Purpose</label>
+                    <select id='sitInPurpose' class='form-select' required>
+                        <option value=''>Select a purpose</option>
+                        ${purposes.map(p => `<option value='${p}'>${p}</option>`).join('')}
+                    </select>
+                </div>
+                <div class='mb-2'>
+                    <label for='sitInLab'>Laboratory</label>
+                    <select id='sitInLab' class='form-select' required>
+                        <option value=''>Select a laboratory</option>
+                        ${labs.map(l => `<option value='${l}'>${l}</option>`).join('')}
+                    </select>
+                </div>
+                <div class='mb-2'>
+                    <label for='sitInPC'>PC Number</label>
+                    <select id='sitInPC' class='form-select' required>
+                        <option value=''>Select a laboratory first</option>
+                    </select>
+                </div>
+                <button type='submit' class='btn btn-success mt-2'>Create Sit-in</button>
+            </form>
+        `;
+        const purposeCategories = [
+            'C Programming', 'Java Programming', 'Python Programming', 'C# Programming', 'Database',
+            'Digital logic & Design', 'Embedded Systems & IOT', 'System Integration & Architecture',
+            'Computer Application', 'Project Management', 'IT Trends', 'Technopreneurship', 'Capstone Project'
+        ];
+        const labUnits = [
+            'Laboratory 524', 'Laboratory 526', 'Laboratory 528', 'Laboratory 530',
+            'Laboratory 542', 'Laboratory 544', 'Laboratory 517'
+        ];
+        document.getElementById('sitInSearchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const idNumber = document.getElementById('sitInIdInput').value.trim();
+            const resultDiv = document.getElementById('sitInResult');
+            resultDiv.innerHTML = '';
+            if (!idNumber) return;
+            fetch(`/admin/users/search/${idNumber}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        // Show modal with form
+                        document.getElementById('sitInModalBody').innerHTML = sitInFormHtml(data.user, purposeCategories, labUnits);
+                        document.getElementById('sitInModalOverlay').style.display = 'flex';
+                        // Add event listeners for lab/PC selection and form submit
+                        const labSelect = document.getElementById('sitInLab');
+                        const pcSelect = document.getElementById('sitInPC');
+                        labSelect.addEventListener('change', function() {
+                            const selectedLab = this.value;
+                            pcSelect.innerHTML = '<option value="">Loading available PCs...</option>';
+                            if (!selectedLab) {
+                                pcSelect.innerHTML = '<option value="">Select a laboratory first</option>';
+                                return;
+                            }
+                            fetch(`/get_available_pcs/${encodeURIComponent(selectedLab)}`)
+                                .then(response => response.json())
+                                .then(data => {
+                                    pcSelect.innerHTML = '';
+                                    if (!data.success || !data.pcs || data.pcs.length === 0) {
+                                        pcSelect.innerHTML = '<option value="">No available PCs in this laboratory</option>';
+                                        return;
+                                    }
+                                    const defaultOption = document.createElement('option');
+                                    defaultOption.value = '';
+                                    defaultOption.textContent = 'Select a PC';
+                                    pcSelect.appendChild(defaultOption);
+                                    data.pcs.forEach(pc => {
+                                        const option = document.createElement('option');
+                                        option.value = pc.id;
+                                        option.textContent = `PC ${pc.computer_number} (${pc.status})`;
+                                        option.disabled = pc.status !== 'vacant';
+                                        pcSelect.appendChild(option);
+                                    });
+                                })
+                                .catch(() => {
+                                    pcSelect.innerHTML = '<option value="">Error loading PCs. Please try again.</option>';
+                                });
+                        });
+                        document.getElementById('sitInCreateForm').addEventListener('submit', function(ev) {
+                            ev.preventDefault();
+                            const purpose = document.getElementById('sitInPurpose').value;
+                            const lab = document.getElementById('sitInLab').value;
+                            const pcId = document.getElementById('sitInPC').value;
+                            if (!purpose || !lab || !pcId) {
+                                alert('Please fill in all fields.');
+                                return;
+                            }
+                            fetch('/admin/sessions/start', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                body: JSON.stringify({ id_number: data.user.id_number, purpose: purpose, laboratory_unit: lab, pc_id: pcId })
+                            })
+                            .then(res => res.json())
+                            .then(resp => {
+                                if (resp.error) {
+                                    alert('Error: ' + resp.error);
+                                } else {
+                                    alert('Sit-in session created!');
+                                    window.location.reload();
+                                }
+                            })
+                            .catch(() => alert('Error creating sit-in session.'));
+                        });
+                    } else {
+                        resultDiv.innerHTML = `<div class='alert alert-danger'>${data.message}</div>`;
+                    }
+                })
+                .catch(() => {
+                    resultDiv.innerHTML = `<div class='alert alert-danger'>Error searching for student.</div>`;
+                });
+        });
+        // Modal close logic
+        document.getElementById('closeSitInModal').onclick = function() {
+            document.getElementById('sitInModalOverlay').style.display = 'none';
+        };
+        document.getElementById('sitInModalOverlay').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html> 

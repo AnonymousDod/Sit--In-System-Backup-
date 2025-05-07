@@ -50,6 +50,8 @@ class Feedback(db.Model):
     feedback_text = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
+    session_id = db.Column(db.Integer, db.ForeignKey('session.id'), nullable=True)
+    session = db.relationship('Session', backref='feedbacks', foreign_keys=[session_id])
 
 class Announcement(db.Model):
     id = db.Column(db.Integer, primary_key=True)

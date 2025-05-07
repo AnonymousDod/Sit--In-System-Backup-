@@ -110,69 +110,53 @@
             {% endif %}
         {% endwith %}
 
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="card stats-card total">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Reservations</h5>
-                        <h2 class="card-text">{{ stats.total }}</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card stats-card active">
-                    <div class="card-body">
-                        <h5 class="card-title">Active Reservations</h5>
-                        <h2 class="card-text">{{ stats.active }}</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card stats-card pending">
-                    <div class="card-body">
-                        <h5 class="card-title">Pending Reservations</h5>
-                        <h2 class="card-text">{{ stats.pending }}</h2>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="filter-buttons">
-            <button class="btn btn-outline-primary active" data-filter="all">All</button>
-            <button class="btn btn-outline-warning" data-filter="pending">Pending</button>
-            <button class="btn btn-outline-success" data-filter="approved">Approved</button>
-            <button class="btn btn-outline-danger" data-filter="rejected">Rejected</button>
-        </div>
 
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>Date & Time</th>
-                        <th>Student</th>
-                        <th>Laboratory Unit</th>
-                        <th>Purpose</th>
+                        <th>Student ID</th>
+                        <th>Student Name</th>
+                        <th>Lab</th>
+                        <th>PC</th>
+                        <th>Date</th>
+                        <th>Time</th>
                         <th>Status</th>
+                        <th>Lab Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for reservation in reservations %}
                     <tr class="reservation-item" data-status="{{ reservation.status }}">
-                        <td>
-                            {{ reservation.date.strftime('%Y-%m-%d') }}<br>
-                            {{ reservation.time.strftime('%H:%M') }}
-                        </td>
-                        <td>
-                            {{ reservation.user.first_name }} {{ reservation.user.last_name }}<br>
-                            <small class="text-muted">{{ reservation.user.id_number }}</small>
-                        </td>
+                        <td>{{ reservation.user.id_number }}</td>
+                        <td>{{ reservation.user.first_name }} {{ reservation.user.last_name }}</td>
                         <td>{{ reservation.laboratory_unit }}</td>
-                        <td>{{ reservation.purpose }}</td>
+                        <td>{{ reservation.computer.computer_number if reservation.computer else reservation.computer_id }}</td>
+                        <td>{{ reservation.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ reservation.time }}</td>
                         <td>
                             <span class="badge {{ reservation.status }}">
                                 {{ reservation.status|title }}
                             </span>
+                        </td>
+                        <td>
+                            {# Safe schedule lookup #}
+                            {% set lab = reservation.lab_number if reservation.lab_number is defined else reservation.laboratory_unit %}
+                            {% set day = reservation.date.strftime('%A') %}
+                            {# Fix: Safe time_str for both string and time object, cross-platform #}
+                            {% if reservation.time is string %}
+                                {% set time_str = reservation.time %}
+                            {% elif reservation.time %}
+                                {% set time_str = reservation.time.strftime('%H:%M') %}
+                            {% else %}
+                                {% set time_str = '' %}
+                            {% endif %}
+                            {% if schedule and schedule.get(lab) and schedule[lab].get(day) and schedule[lab][day].get(time_str) %}
+                                <span class="badge bg-danger">Scheduled Class</span>
+                            {% else %}
+                                <span class="badge bg-success">Available</span>
+                            {% endif %}
                         </td>
                         <td>
                             <div class="btn-group">
