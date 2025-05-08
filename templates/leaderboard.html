@@ -152,7 +152,7 @@
             background: var(--primary-color);
             color: var(--white);
             display: grid;
-            grid-template-columns: 80px 1fr 120px;
+            grid-template-columns: 80px 1fr 120px 120px;
             gap: 1rem;
             font-weight: bold;
             font-size: 1.1rem;
@@ -161,7 +161,7 @@
         .leaderboard-item {
             padding: 1.5rem;
             display: grid;
-            grid-template-columns: 80px 1fr 120px;
+            grid-template-columns: 80px 1fr 120px 120px;
             gap: 1rem;
             align-items: center;
             border-bottom: 1px solid #e5e7eb;
@@ -327,7 +327,7 @@
 
             .leaderboard-header,
             .leaderboard-item {
-                grid-template-columns: 60px 1fr 100px;
+                grid-template-columns: 60px 1fr 100px 100px;
                 padding: 1rem;
             }
 
@@ -383,6 +383,7 @@
                 <div>Rank</div>
                 <div>Student</div>
                 <div>Points</div>
+                <div>Most Active</div>
             </div>
             {% for user in users %}
             <div class="leaderboard-item">
@@ -400,6 +401,10 @@
                 <div class="points">
                     <i class="fas fa-star"></i>
                     {{ user.points }}
+                </div>
+                <div class="points">
+                    <i class="fas fa-clock"></i>
+                    {{ user_sitin_counts[user.id] }}
                 </div>
             </div>
             {% endfor %}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - CICS Laboratory System</title>
+    <title>Admin Dashboard</title>
     <style>
         * {
             margin: 0;
@@ -797,6 +797,15 @@
                 <div class="action-info">
                     <div class="action-title">Lab Schedules</div>
                     <div class="action-description">View all laboratory schedules</div>
+                </div>
+            </div>
+            <div class="action-card" data-url="{{ url_for('admin_logs') }}">
+                <div class="action-icon">
+                    <i class="fas fa-book"></i>
+                </div>
+                <div class="action-info">
+                    <div class="action-title">Logs</div>
+                    <div class="action-description">View all reservation and session logs</div>
                 </div>
             </div>
         </div>

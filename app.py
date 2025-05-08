@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session as flask_session, send_from_directory, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session as flask_session, send_from_directory, jsonify, send_file, abort
 from flask_sqlalchemy import SQLAlchemy
 import os
 from werkzeug.utils import secure_filename
@@ -49,7 +49,8 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads/resources'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
 app.config['ALLOWED_EXTENSIONS'] = {
     'image': {'png', 'jpg', 'jpeg', 'gif'},
-    'video': {'mp4', 'webm', 'ogg'}
+    'video': {'mp4', 'webm', 'ogg'},
+    'document': {'pdf', 'doc', 'docx', 'xls', 'xlsx'}  # Added document types
 }
 
 # Create upload folder if it doesn't exist
@@ -124,10 +125,11 @@ def home():
     if user.is_admin:
         return redirect(url_for('admin_dashboard'))
     
-    # Notify user of any rejected reservations
-    rejected_reservations = Reservation.query.filter_by(user_id=user.id, status='rejected').order_by(Reservation.date.desc()).all()
-    for reservation in rejected_reservations:
-        flash(f"Your reservation for {reservation.laboratory_unit} on {reservation.date.strftime('%Y-%m-%d')} at {reservation.time} was rejected.", 'warning')
+    # Only show rejected reservation notifications once immediately after login
+    if flask_session.pop('show_rejected_notifs', False):
+        rejected_reservations = Reservation.query.filter_by(user_id=user.id, status='rejected').order_by(Reservation.date.desc()).all()
+        for reservation in rejected_reservations:
+            flash(f"Your reservation for {reservation.laboratory_unit} on {reservation.date.strftime('%Y-%m-%d')} at {reservation.time} was rejected.", 'warning')
     
     active_announcements = Announcement.query.filter_by(is_active=True).order_by(Announcement.created_at.desc()).all()
     labs = [
@@ -235,6 +237,7 @@ def login():
     
     if user and check_password_hash(user.password, password):
         flask_session['user_id'] = user.id_number
+        flask_session['show_rejected_notifs'] = True  # Set flag to show rejected notifications after login
         flash('Login successful!', 'success')
         if user.is_admin:
             return redirect(url_for('admin_dashboard'))
@@ -246,6 +249,7 @@ def login():
 @app.route('/logout')
 def logout():
     flask_session.pop('user_id', None)
+    flask_session.pop('rejected_notifs_shown', None)
     flash('Logged out successfully', 'success')
     return redirect(url_for('index'))
 
@@ -678,8 +682,10 @@ def add_resource():
                 file_type = 'image'
             elif file_ext in app.config['ALLOWED_EXTENSIONS']['video']:
                 file_type = 'video'
+            elif file_ext in app.config['ALLOWED_EXTENSIONS']['document']:
+                file_type = 'document'
             else:
-                flash('Invalid file type. Please upload an image or video file.', 'error')
+                flash('Invalid file type. Please upload an image, video, or document file (PDF, Word, Excel).', 'error')
                 return redirect(url_for('admin_resources'))
             
             # Save file
@@ -804,6 +810,15 @@ def submit_reservation():
         if not all([date, time, purpose, laboratory_unit, pc_id]):
             flash('Please fill in all fields', 'error')
             print('DEBUG: Missing field(s)')
+            return redirect(url_for('home'))
+        # Prevent duplicate reservation: block if user has a pending or approved reservation for any future date/time
+        existing_res = Reservation.query.filter(
+            Reservation.user_id == user.id,
+            Reservation.status.in_(['pending', 'approved']),
+            Reservation.date >= datetime.now().date()
+        ).first()
+        if existing_res:
+            flash('You already have a pending or approved reservation. Please wait for it to be processed before making another.', 'error')
             return redirect(url_for('home'))
         # Check if the selected PC is available
         computer = Computer.query.get(pc_id)
@@ -983,31 +998,53 @@ def admin_sessions():
 def start_session():
     user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
-        return jsonify({'error': 'Access denied. Admin privileges required.'}), 403
-
+        flash('Access denied. Admin privileges required.', 'error')
+        return redirect(url_for('admin_sessions'))
+    
     data = request.get_json()
     id_number = data.get('id_number')
     purpose = data.get('purpose')
     laboratory_unit = data.get('laboratory_unit')
     pc_id = data.get('pc_id')
-
+    
     if not all([id_number, purpose, laboratory_unit, pc_id]):
-        return jsonify({'error': 'Missing required fields'}), 400
-
+        flash('Missing required fields.', 'error')
+        return redirect(url_for('admin_sessions'))
+    
     # Find user by ID number
     student = User.query.filter_by(id_number=id_number).first()
     if not student:
-        return jsonify({'error': 'User not found'}), 404
+        flash('User not found.', 'error')
+        return redirect(url_for('admin_sessions'))
 
+    # Prevent sit-in for admin users
+    if student.is_admin:
+        flash('Admin users are not allowed to sit in.', 'error')
+        return redirect(url_for('admin_sessions'))
+
+    # Prevent sit-in if user has a pending reservation
+    pending_res = Reservation.query.filter_by(user_id=student.id, status='pending').first()
+    if pending_res:
+        flash('User has a pending reservation. Cannot start a new sit-in session.', 'error')
+        return redirect(url_for('admin_sessions'))
+
+    # Prevent sit-in if user has an active session
+    active_session = Session.query.filter_by(user_id=student.id, status='active').first()
+    if active_session:
+        flash('User already has an active session. Cannot start a new sit-in session.', 'error')
+        return redirect(url_for('admin_sessions'))
+    
     # Check if user has remaining sessions
     if student.remaining_sessions <= 0:
-        return jsonify({'error': 'User has no remaining sessions'}), 400
+        flash('User has no remaining sessions.', 'error')
+        return redirect(url_for('admin_sessions'))
 
     # Check if the selected PC is available
     computer = Computer.query.get(pc_id)
     if not computer or computer.status != 'vacant':
-        return jsonify({'error': 'The selected PC is not available'}), 400
-
+        flash('The selected PC is not available.', 'error')
+        return redirect(url_for('admin_sessions'))
+    
     # Create new session
     session_obj = Session(
         user_id=student.id,
@@ -1015,7 +1052,7 @@ def start_session():
         laboratory_unit=laboratory_unit,
         computer_id=pc_id
     )
-
+    
     try:
         # Decrement remaining sessions
         student.remaining_sessions -= 1
@@ -1023,14 +1060,12 @@ def start_session():
         computer.status = 'occupied'
         db.session.add(session_obj)
         db.session.commit()
-        return jsonify({
-            'message': 'Session started successfully',
-            'session': session_obj.to_dict(),
-            'remaining_sessions': student.remaining_sessions
-        }), 201
+        flash('Session started successfully!', 'success')
+        return redirect(url_for('admin_sessions'))
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        flash('Error starting session: ' + str(e), 'error')
+        return redirect(url_for('admin_sessions'))
 
 @app.route('/admin/sessions/<int:session_id>/end', methods=['POST'])
 @login_required
@@ -1038,12 +1073,12 @@ def end_session(session_id):
     user = User.query.filter_by(id_number=flask_session['user_id']).first()
     if not user or not user.is_admin:
         return jsonify({'error': 'Access denied. Admin privileges required.'}), 403
-
+    
     lab_session = Session.query.get_or_404(session_id)
-
+    
     if lab_session.status == 'completed':
         return jsonify({'error': 'Session already completed'}), 400
-
+    
     try:
         # Get the computer associated with the session
         computer = Computer.query.get(lab_session.computer_id)
@@ -1261,7 +1296,7 @@ def export_report(report_type, format_type):
                 'status': session.status
             })
         title = "User Activity Report"
-    
+       
     elif report_type == 'lab_usage':
         query = Session.query.filter(
             Session.start_time >= start_date,
@@ -1561,10 +1596,10 @@ def admin_computers():
     # If no computers exist, create default computers for each laboratory
     if not computers:
         for lab in laboratories:
-            # Add 10 computers to each laboratory
-            for i in range(1, 11):
+            # Add 50 computers to each laboratory
+            for i in range(1, 51):
                 computer = Computer(
-                    computer_number=f"{lab.split()[1]}-{i:02d}",  # e.g., "524-01", "524-02", etc.
+                    computer_number=f"PC-{i:02d}",  # e.g., "PC-01", "PC-02", etc.
                     laboratory_unit=lab,
                     status='vacant'  # Default status is vacant
                 )
@@ -1594,9 +1629,14 @@ def add_computer():
         flash('Computer number and laboratory unit are required', 'error')
         return redirect(url_for('admin_computers'))
     
-    # Check if computer number already exists
-    if Computer.query.filter_by(computer_number=computer_number).first():
-        flash('Computer number already exists', 'error')
+    # Validate computer number format
+    if not computer_number.startswith('PC-') or not computer_number[3:].isdigit():
+        flash('Computer number must be in format: PC-01, PC-02, etc.', 'error')
+        return redirect(url_for('admin_computers'))
+    
+    # Check if computer number already exists in the same laboratory
+    if Computer.query.filter_by(computer_number=computer_number, laboratory_unit=laboratory_unit).first():
+        flash('This PC number already exists in this laboratory', 'error')
         return redirect(url_for('admin_computers'))
     
     computer = Computer(
@@ -1700,8 +1740,25 @@ def leaderboard():
         User.is_admin == False,
         User.points > 0
     ).order_by(User.points.desc()).all()
-    
-    return render_template('leaderboard.html', users=users)
+    # Calculate sit-in count for each user
+    user_sitin_counts = {}
+    from models import Session
+    awarded_users = []
+    for user in users:
+        sitin_count = Session.query.filter_by(user_id=user.id, status='completed').count()
+        user_sitin_counts[user.id] = sitin_count
+        # Award sessions for every 3 points, but only if not already awarded
+        sessions_to_award = user.points // 3 - (user.sessions_awarded_for_points or 0)
+        if sessions_to_award > 0:
+            user.remaining_sessions += sessions_to_award
+            user.sessions_awarded_for_points = (user.sessions_awarded_for_points or 0) + sessions_to_award
+            awarded_users.append(f"{user.first_name} {user.last_name} (+{sessions_to_award} session{'s' if sessions_to_award > 1 else ''})")
+    if awarded_users:
+        db.session.commit()
+        flash(f"Awarded extra session(s) to: {', '.join(awarded_users)} (for every 3 points)", 'success')
+    # Sort users by points, then by sit-in count
+    users = sorted(users, key=lambda u: (u.points, user_sitin_counts[u.id]), reverse=True)
+    return render_template('leaderboard.html', users=users, user_sitin_counts=user_sitin_counts)
 
 @app.route('/user/activity-history')
 @login_required
@@ -1989,6 +2046,22 @@ def create_sit_in():
         flash('Lab is currently scheduled for a class', 'error')
         return redirect(url_for('admin_dashboard'))
     
+    # Prevent sit-in for admin users
+    student = User.query.filter_by(id_number=student_id).first()
+    if student and student.is_admin:
+        flash('Admin users are not allowed to sit in.', 'error')
+        return redirect(url_for('admin_dashboard'))
+    
+    if student:
+        pending_res = Reservation.query.filter_by(user_id=student.id, status='pending').first()
+        if pending_res:
+            flash('User has a pending reservation. Cannot start a new sit-in session.', 'error')
+            return redirect(url_for('admin_dashboard'))
+        active_session = Session.query.filter_by(user_id=student.id, status='active').first()
+        if active_session:
+            flash('User already has an active session. Cannot start a new sit-in session.', 'error')
+            return redirect(url_for('admin_dashboard'))
+    
     # Create new session
     session = Session(
         student_id=student_id,
@@ -2098,6 +2171,30 @@ def get_lab_schedule():
 # Replace all current_user references with session-based user lookup
 # Example: Replace 'current_user.id' with 'user.id' where user is fetched from session
 # (No code output for replacements, as this is a comment for the edit model)
+
+@app.route('/admin/logs')
+@login_required
+@admin_required
+def admin_logs():
+    # Fetch all sessions and reservations, join with User and Computer
+    sessions = Session.query.join(User).join(Computer).order_by(Session.start_time.desc()).all()
+    reservations = Reservation.query.join(User).join(Computer).order_by(Reservation.date.desc(), Reservation.time.desc()).all()
+    return render_template('admin_logs.html', sessions=sessions, reservations=reservations)
+
+@app.route('/resources/<int:resource_id>/download')
+@login_required
+def user_download_resource_file(resource_id):
+    resource = LabResource.query.get_or_404(resource_id)
+    if not resource.file_path:
+        flash('No file available for this resource.', 'error')
+        return redirect(url_for('user_resources'))
+    filename = resource.file_path.split('/')[-1]
+    directory = os.path.join(app.static_folder, 'uploads', 'resources')
+    try:
+        return send_from_directory(directory, filename, as_attachment=True)
+    except Exception as e:
+        flash('Error downloading file.', 'error')
+        return redirect(url_for('user_resources'))
 
 if __name__ == '__main__':
     init_db()  # Initialize database and create admin user

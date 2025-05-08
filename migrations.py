@@ -104,7 +104,50 @@ def migrate_sessions():
             # Rollback changes if something goes wrong
             db.engine.execute('DROP TABLE IF EXISTS session_new')
 
+def add_total_points_column():
+    with app.app_context():
+        try:
+            db.engine.execute('ALTER TABLE users ADD COLUMN total_points INTEGER DEFAULT 0')
+            print("Added total_points column to users table")
+        except Exception as e:
+            print(f"Column total_points may already exist: {str(e)}")
+
+def add_sessions_awarded_for_points_column():
+    with app.app_context():
+        try:
+            db.engine.execute('ALTER TABLE users ADD COLUMN sessions_awarded_for_points INTEGER DEFAULT 0')
+            print("Added sessions_awarded_for_points column to users table")
+        except Exception as e:
+            print(f"Column sessions_awarded_for_points may already exist: {str(e)}")
+
+def migrate_computer_unique_constraint():
+    with app.app_context():
+        # Create new table with correct constraints
+        db.engine.execute('''
+            CREATE TABLE computers_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                computer_number VARCHAR(20) NOT NULL,
+                status VARCHAR(20) DEFAULT 'vacant',
+                laboratory_unit VARCHAR(100) NOT NULL,
+                last_updated DATETIME,
+                UNIQUE(computer_number, laboratory_unit)
+            )
+        ''')
+        # Copy data
+        db.engine.execute('''
+            INSERT INTO computers_new (id, computer_number, status, laboratory_unit, last_updated)
+            SELECT id, computer_number, status, laboratory_unit, last_updated FROM computers
+        ''')
+        # Drop old table
+        db.engine.execute('DROP TABLE computers')
+        # Rename new table
+        db.engine.execute('ALTER TABLE computers_new RENAME TO computers')
+        print('Migration complete: unique constraint is now on (computer_number, laboratory_unit)')
+
 if __name__ == '__main__':
     add_missing_columns()
     migrate()
-    migrate_sessions() 
+    migrate_sessions()
+    add_total_points_column()
+    add_sessions_awarded_for_points_column()
+    migrate_computer_unique_constraint() 

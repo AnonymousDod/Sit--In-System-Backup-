@@ -25,6 +25,7 @@ class User(db.Model):
     sessions = db.relationship('Session', backref='user', lazy=True)
     reservations = db.relationship('Reservation', backref='user', lazy=True)
     feedback = db.relationship('Feedback', backref='user', lazy=True)
+    sessions_awarded_for_points = db.Column(db.Integer, default=0)
 
     def __repr__(self):
         return f'<User {self.id_number}>'
@@ -135,12 +136,12 @@ class Reservation(db.Model):
 
 class Computer(db.Model):
     __tablename__ = 'computers'
-    
     id = db.Column(db.Integer, primary_key=True)
-    computer_number = db.Column(db.String(20), unique=True, nullable=False)
+    computer_number = db.Column(db.String(20), nullable=False)
     status = db.Column(db.String(20), default='vacant')  # vacant, occupied, maintenance
     laboratory_unit = db.Column(db.String(100), nullable=False)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('computer_number', 'laboratory_unit', name='uix_pc_lab'),)
     
     def __repr__(self):
         return f'<Computer {self.computer_number}>'

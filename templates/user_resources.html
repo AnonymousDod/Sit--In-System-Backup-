@@ -108,15 +108,18 @@
                         <div class="mt-auto">
                             {% if resource.file_type == 'image' %}
                                 <a href="{{ url_for('static', filename=resource.file_path) }}" target="_blank" class="btn btn-primary w-100 mb-2"><i class="fas fa-eye"></i> View Image</a>
-                                <a href="{{ url_for('static', filename=resource.file_path) }}" download class="btn btn-outline-primary w-100"><i class="fas fa-download"></i> Download Image</a>
+                                <a href="{{ url_for('user_download_resource_file', resource_id=resource.id) }}" class="btn btn-outline-primary w-100"><i class="fas fa-download"></i> Download Image</a>
                             {% elif resource.file_type == 'video' %}
                                 <a href="{{ url_for('static', filename=resource.file_path) }}" download class="btn btn-primary w-100"><i class="fas fa-download"></i> Download Video</a>
                             {% elif resource.file_path and resource.file_path.endswith('.pdf') %}
-                                <a href="{{ url_for('static', filename=resource.file_path) }}" target="_blank" class="btn btn-primary w-100"><i class="fas fa-file-pdf"></i> View PDF</a>
+                                <a href="{{ url_for('static', filename=resource.file_path) }}" target="_blank" class="btn btn-primary w-100 mb-2"><i class="fas fa-file-pdf"></i> View PDF</a>
+                                <a href="{{ url_for('user_download_resource_file', resource_id=resource.id) }}" class="btn btn-outline-primary w-100"><i class="fas fa-download"></i> Download PDF</a>
                             {% elif resource.file_path and (resource.file_path.endswith('.doc') or resource.file_path.endswith('.docx')) %}
-                                <a href="{{ url_for('static', filename=resource.file_path) }}" download class="btn btn-primary w-100"><i class="fas fa-file-word"></i> Download Word Document</a>
+                                <a href="{{ url_for('user_download_resource_file', resource_id=resource.id) }}" class="btn btn-primary w-100">
+                                    <i class="fas fa-file-word"></i> Download Word Document
+                                </a>
                             {% elif resource.file_path %}
-                                <a href="{{ url_for('static', filename=resource.file_path) }}" download class="btn btn-primary w-100"><i class="fas fa-download"></i> Download File</a>
+                                <a href="{{ url_for('user_download_resource_file', resource_id=resource.id) }}" class="btn btn-primary w-100"><i class="fas fa-download"></i> Download File</a>
                             {% elif resource.link and resource.link != '-' %}
                                 <a href="{{ resource.link }}" target="_blank" class="btn btn-primary w-100"><i class="fas fa-external-link-alt"></i> Access Resource</a>
                             {% endif %}
