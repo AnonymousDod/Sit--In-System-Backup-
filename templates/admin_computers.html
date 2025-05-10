@@ -172,17 +172,6 @@
                 </button>
             </div>
         </div>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
         <div class="mb-4">
             <h2>Computer Control</h2>
             <p class="text-muted">Manage computer status and availability in each laboratory</p>

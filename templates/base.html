@@ -71,6 +71,15 @@
                 </ul>
                 <ul class="navbar-nav">
                     {% if user %}
+                        <li class="nav-item dropdown" id="notif-bell-container">
+                          <a class="nav-link position-relative" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-bell"></i>
+                            <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.7em;display:none;">0</span>
+                          </a>
+                          <ul class="dropdown-menu dropdown-menu-end" id="notifList" style="min-width: 300px; max-width: 400px;">
+                            <li class="dropdown-item text-muted" id="notifEmpty">No notifications</li>
+                          </ul>
+                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="fas fa-user"></i> {{ user.first_name }} {{ user.last_name }}
@@ -87,15 +96,12 @@
         </div>
     </nav>
 
-    <!-- Flash Messages -->
-    <div class="flash-messages">
+    <!-- Flash Messages (hidden, for JS popups only) -->
+    <div id="hidden-flash-messages" style="display:none;">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
+                    <div class="flash-message alert-{{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
@@ -116,6 +122,71 @@
                 $('.alert').alert('close');
             }, 5000);
         });
+    </script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/notifications')
+          .then(res => res.json())
+          .then(notifs => {
+            const notifCount = document.getElementById('notifCount');
+            const notifList = document.getElementById('notifList');
+            const notifEmpty = document.getElementById('notifEmpty');
+            if (notifs.length > 0) {
+              notifCount.textContent = notifs.length;
+              notifCount.style.display = 'inline-block';
+              notifList.innerHTML = notifs.map(n =>
+                `<li class="dropdown-item">${n.message} <br><small class="text-muted">${n.created_at}</small></li>`
+              ).join('');
+            } else {
+              notifCount.style.display = 'none';
+              notifList.innerHTML = '<li class="dropdown-item text-muted" id="notifEmpty">No notifications</li>';
+            }
+          });
+    });
+    </script>
+    <script>
+        // Show flash messages as popups on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const flashMessages = document.querySelectorAll('#hidden-flash-messages .flash-message');
+            flashMessages.forEach(function(message) {
+                const messageText = message.textContent.trim();
+                const messageType = message.classList.contains('alert-success') ? 'success' : 
+                                   message.classList.contains('alert-danger') ? 'danger' : 
+                                   message.classList.contains('alert-warning') ? 'warning' : 'info';
+                showPopupNotification(messageText, messageType);
+            });
+        });
+
+        // New popup notification function
+        function showPopupNotification(message, type) {
+            const toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                const container = document.createElement('div');
+                container.id = 'toast-container';
+                container.style.position = 'fixed';
+                container.style.top = '20px';
+                container.style.right = '20px';
+                container.style.zIndex = '1050';
+                document.body.appendChild(container);
+            }
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            toast.innerHTML = `
+                <div class="toast-header bg-${type} text-white">
+                    <strong class="me-auto">Notification</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            `;
+            document.getElementById('toast-container').appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast, { autohide: true, delay: 2000 });
+            bsToast.show();
+        }
     </script>
 </body>
 </html> 

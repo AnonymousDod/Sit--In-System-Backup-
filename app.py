@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 import os
 from werkzeug.utils import secure_filename
-from models import db, User, Feedback, Announcement, Reservation, Session, Computer
+from models import db, User, Feedback, Announcement, Reservation, Session, Computer, Notification
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date, timedelta
 from functools import wraps
@@ -125,11 +125,14 @@ def home():
     if user.is_admin:
         return redirect(url_for('admin_dashboard'))
     
-    # Only show rejected reservation notifications once immediately after login
+    # Only show the latest unread notification once after login
+    from models import Notification
     if flask_session.pop('show_rejected_notifs', False):
-        rejected_reservations = Reservation.query.filter_by(user_id=user.id, status='rejected').order_by(Reservation.date.desc()).all()
-        for reservation in rejected_reservations:
-            flash(f"Your reservation for {reservation.laboratory_unit} on {reservation.date.strftime('%Y-%m-%d')} at {reservation.time} was rejected.", 'warning')
+        latest_notif = Notification.query.filter_by(user_id=user.id, is_read=False).order_by(Notification.created_at.desc()).first()
+        if latest_notif:
+            flash(latest_notif.message, 'info')
+            latest_notif.is_read = True
+            db.session.commit()
     
     active_announcements = Announcement.query.filter_by(is_active=True).order_by(Announcement.created_at.desc()).all()
     labs = [
@@ -811,14 +814,18 @@ def submit_reservation():
             flash('Please fill in all fields', 'error')
             print('DEBUG: Missing field(s)')
             return redirect(url_for('home'))
-        # Prevent duplicate reservation: block if user has a pending or approved reservation for any future date/time
+        # Prevent duplicate reservation: block if user has a pending or approved reservation
         existing_res = Reservation.query.filter(
             Reservation.user_id == user.id,
-            Reservation.status.in_(['pending', 'approved']),
-            Reservation.date >= datetime.now().date()
+            Reservation.status.in_(['pending', 'approved'])
         ).first()
         if existing_res:
             flash('You already have a pending or approved reservation. Please wait for it to be processed before making another.', 'error')
+            return redirect(url_for('home'))
+        # Prevent reservation if user has an active session
+        active_session = Session.query.filter_by(user_id=user.id, status='active').first()
+        if active_session:
+            flash('You already have an active session. Please end your current session before making a new reservation.', 'error')
             return redirect(url_for('home'))
         # Check if the selected PC is available
         computer = Computer.query.get(pc_id)
@@ -853,6 +860,8 @@ def submit_reservation():
             db.session.add(new_reservation)
             db.session.commit()
             flash('Reservation submitted successfully!', 'success')
+            # Notify admin of new reservation
+            create_notification(f'New reservation submitted by {user.first_name} {user.last_name} ({user.id_number})', for_admin=True)
         except Exception as e:
             db.session.rollback()
             flash('An error occurred while submitting reservation', 'error')
@@ -940,11 +949,21 @@ def update_reservation_status(reservation_id):
             db.session.add(session_obj)
             db.session.delete(reservation)
             db.session.commit()
+            # Notify user of approval (with details)
+            msg = f"Your reservation for {session_obj.laboratory_unit} on {session_obj.start_time.strftime('%Y-%m-%d')} at {session_obj.start_time.strftime('%H:%M')} was approved and your session has started."
+            create_notification(msg, user_id=user.id)
             return jsonify({'success': True, 'message': 'Reservation approved and session started for student!'})
         else:
             # If rejected, mark as rejected instead of deleting
             reservation.status = 'rejected'
+            # Set computer status to vacant if it was reserved for this reservation
+            computer = Computer.query.get(reservation.computer_id)
+            if computer and computer.status == 'reserved':
+                computer.status = 'vacant'
             db.session.commit()
+            # Notify user of rejection (with details)
+            msg = f"Your reservation for {reservation.laboratory_unit} on {reservation.date.strftime('%Y-%m-%d')} at {reservation.time} was rejected."
+            create_notification(msg, user_id=reservation.user_id)
             return jsonify({'success': True, 'message': 'Reservation rejected.'})
     except Exception as e:
         db.session.rollback()
@@ -997,7 +1016,10 @@ def admin_sessions():
 @login_required
 def start_session():
     user = User.query.filter_by(id_number=flask_session['user_id']).first()
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if not user or not user.is_admin:
+        if is_ajax:
+            return jsonify({'error': 'Access denied. Admin privileges required.'}), 403
         flash('Access denied. Admin privileges required.', 'error')
         return redirect(url_for('admin_sessions'))
     
@@ -1008,40 +1030,54 @@ def start_session():
     pc_id = data.get('pc_id')
     
     if not all([id_number, purpose, laboratory_unit, pc_id]):
+        if is_ajax:
+            return jsonify({'error': 'Missing required fields.'}), 400
         flash('Missing required fields.', 'error')
         return redirect(url_for('admin_sessions'))
     
     # Find user by ID number
     student = User.query.filter_by(id_number=id_number).first()
     if not student:
+        if is_ajax:
+            return jsonify({'error': 'User not found.'}), 404
         flash('User not found.', 'error')
         return redirect(url_for('admin_sessions'))
 
     # Prevent sit-in for admin users
     if student.is_admin:
+        if is_ajax:
+            return jsonify({'error': 'Admin users are not allowed to sit in.'}), 400
         flash('Admin users are not allowed to sit in.', 'error')
         return redirect(url_for('admin_sessions'))
 
     # Prevent sit-in if user has a pending reservation
     pending_res = Reservation.query.filter_by(user_id=student.id, status='pending').first()
     if pending_res:
+        if is_ajax:
+            return jsonify({'error': 'User has a pending reservation. Cannot start a new sit-in session.'}), 400
         flash('User has a pending reservation. Cannot start a new sit-in session.', 'error')
         return redirect(url_for('admin_sessions'))
 
     # Prevent sit-in if user has an active session
     active_session = Session.query.filter_by(user_id=student.id, status='active').first()
     if active_session:
+        if is_ajax:
+            return jsonify({'error': 'User already has an active session. Cannot start a new sit-in session.'}), 400
         flash('User already has an active session. Cannot start a new sit-in session.', 'error')
         return redirect(url_for('admin_sessions'))
     
     # Check if user has remaining sessions
     if student.remaining_sessions <= 0:
+        if is_ajax:
+            return jsonify({'error': 'User has no remaining sessions.'}), 400
         flash('User has no remaining sessions.', 'error')
         return redirect(url_for('admin_sessions'))
 
     # Check if the selected PC is available
     computer = Computer.query.get(pc_id)
     if not computer or computer.status != 'vacant':
+        if is_ajax:
+            return jsonify({'error': 'The selected PC is not available.'}), 400
         flash('The selected PC is not available.', 'error')
         return redirect(url_for('admin_sessions'))
     
@@ -1050,7 +1086,8 @@ def start_session():
         user_id=student.id,
         purpose=purpose,
         laboratory_unit=laboratory_unit,
-        computer_id=pc_id
+        computer_id=pc_id,
+        is_manual=True  # Set is_manual to True for manually created sessions
     )
     
     try:
@@ -1060,10 +1097,14 @@ def start_session():
         computer.status = 'occupied'
         db.session.add(session_obj)
         db.session.commit()
+        if is_ajax:
+            return jsonify({'success': True, 'message': 'Session started successfully!'})
         flash('Session started successfully!', 'success')
         return redirect(url_for('admin_sessions'))
     except Exception as e:
         db.session.rollback()
+        if is_ajax:
+            return jsonify({'error': 'Error starting session: ' + str(e)}), 500
         flash('Error starting session: ' + str(e), 'error')
         return redirect(url_for('admin_sessions'))
 
@@ -1076,8 +1117,8 @@ def end_session(session_id):
     
     lab_session = Session.query.get_or_404(session_id)
     
-    if lab_session.status == 'completed':
-        return jsonify({'error': 'Session already completed'}), 400
+    if lab_session.status != 'active':
+        return jsonify({'error': 'Session is not active or already completed.'}), 400
     
     try:
         # Get the computer associated with the session
@@ -1691,46 +1732,6 @@ def delete_computer(computer_id):
     
     return redirect(url_for('admin_computers'))
 
-@app.route('/admin/add-points', methods=['GET'])
-@app.route('/admin/users/<int:user_id>/add-points', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def add_points(user_id=None):
-    if request.method == 'GET':
-        if user_id is None:
-            # Show list of all non-admin users
-            users = User.query.filter_by(is_admin=False).order_by(User.last_name).all()
-            return render_template('add_points.html', users=users)
-        else:
-            # Show form for specific user
-            user = User.query.get_or_404(user_id)
-            return render_template('add_points.html', user=user)
-    
-    # Handle POST request
-    points = request.form.get('points', type=int)
-    
-    if points is None or points <= 0:
-        return jsonify({
-            'success': False,
-            'message': 'Please provide a valid number of points'
-        }), 400
-    
-    try:
-        user = User.query.get_or_404(user_id)
-        user.points += points
-        db.session.commit()
-        return jsonify({
-            'success': True,
-            'message': f'Added {points} points to {user.first_name} {user.last_name}',
-            'new_points': user.points
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': f'Error adding points: {str(e)}'
-        }), 500
-
 @app.route('/admin/leaderboard')
 @login_required
 @admin_required
@@ -2037,45 +2038,55 @@ def create_sit_in():
     pc_number = request.form.get('pc_number')
     purpose = request.form.get('purpose')
     
-    # Get current date and time
     now = datetime.now()
     current_time = now.strftime('%I:%M %p')
-    
-    # Check if lab is available
-    if not is_lab_available(lab_number, now, current_time):
-        flash('Lab is currently scheduled for a class', 'error')
-        return redirect(url_for('admin_dashboard'))
-    
-    # Prevent sit-in for admin users
-    student = User.query.filter_by(id_number=student_id).first()
-    if student and student.is_admin:
-        flash('Admin users are not allowed to sit in.', 'error')
-        return redirect(url_for('admin_dashboard'))
-    
-    if student:
-        pending_res = Reservation.query.filter_by(user_id=student.id, status='pending').first()
-        if pending_res:
-            flash('User has a pending reservation. Cannot start a new sit-in session.', 'error')
+    try:
+        # Check if lab is available
+        if not is_lab_available(lab_number, now, current_time):
+            flash('Lab is currently scheduled for a class', 'error')
             return redirect(url_for('admin_dashboard'))
-        active_session = Session.query.filter_by(user_id=student.id, status='active').first()
-        if active_session:
-            flash('User already has an active session. Cannot start a new sit-in session.', 'error')
+        # Prevent sit-in for admin users
+        student = User.query.filter_by(id_number=student_id).first()
+        if student and student.is_admin:
+            flash('Admin users are not allowed to sit in.', 'error')
             return redirect(url_for('admin_dashboard'))
-    
-    # Create new session
-    session = Session(
-        student_id=student_id,
-        lab_number=lab_number,
-        pc_number=pc_number,
-        purpose=purpose,
-        start_time=now
-    )
-    
-    db.session.add(session)
-    db.session.commit()
-    
-    flash('Sit-in session created successfully', 'success')
-    return redirect(url_for('admin_dashboard'))
+        if student:
+            pending_res = Reservation.query.filter_by(user_id=student.id, status='pending').first()
+            if pending_res:
+                flash('User has a pending reservation. Cannot start a new sit-in session.', 'error')
+                return redirect(url_for('admin_dashboard'))
+            active_session = Session.query.filter_by(user_id=student.id, status='active').first()
+            if active_session:
+                flash('User already has an active session. Cannot start a new sit-in session.', 'error')
+                return redirect(url_for('admin_dashboard'))
+        # Find the computer object
+        computer = Computer.query.filter_by(computer_number=pc_number, laboratory_unit=lab_number).first()
+        if not computer:
+            flash('Selected PC not found.', 'error')
+            return redirect(url_for('admin_dashboard'))
+        if computer.status != 'vacant':
+            flash('Selected PC is not available.', 'error')
+            return redirect(url_for('admin_dashboard'))
+        # Create new session with correct fields
+        session = Session(
+            user_id=student.id,
+            purpose=purpose,
+            laboratory_unit=lab_number,
+            computer_id=computer.id,
+            start_time=now,
+            is_manual=True  # Set is_manual to True for manually created sessions
+        )
+        db.session.add(session)
+        computer.status = 'occupied'
+        student.remaining_sessions -= 1
+        db.session.commit()
+        flash('Sit-in session created successfully', 'success')
+        return redirect(url_for('admin_dashboard'))  # Return immediately after success
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creating sit-in session: {str(e)}', 'error')
+        print(f'Error creating sit-in session: {str(e)}')
+        return redirect(url_for('admin_dashboard'))
 
 @app.route('/reserve', methods=['POST'])
 @login_required
@@ -2176,10 +2187,17 @@ def get_lab_schedule():
 @login_required
 @admin_required
 def admin_logs():
-    # Fetch all sessions and reservations, join with User and Computer
-    sessions = Session.query.join(User).join(Computer).order_by(Session.start_time.desc()).all()
-    reservations = Reservation.query.join(User).join(Computer).order_by(Reservation.date.desc(), Reservation.time.desc()).all()
-    return render_template('admin_logs.html', sessions=sessions, reservations=reservations)
+    # Fetch logs for sit-in approvals, rejections, and manual sit-ins
+    # 1. Approval/rejection logs from Notification table
+    approval_logs = Notification.query.filter(
+        Notification.message.like('%was approved%') |
+        Notification.message.like('%was rejected%')
+    ).order_by(Notification.created_at.desc()).all()
+    
+    # 2. Manual sit-ins: Sessions created by admin manually
+    manual_sitins = Session.query.filter_by(is_manual=True).order_by(Session.start_time.desc()).all()
+    
+    return render_template('admin_logs.html', approval_logs=approval_logs, manual_sitins=manual_sitins)
 
 @app.route('/resources/<int:resource_id>/download')
 @login_required
@@ -2195,6 +2213,24 @@ def user_download_resource_file(resource_id):
     except Exception as e:
         flash('Error downloading file.', 'error')
         return redirect(url_for('user_resources'))
+
+# --- Notification Helper ---
+def create_notification(message, user_id=None, for_admin=False):
+    notif = Notification(message=message, user_id=user_id, for_admin=for_admin)
+    db.session.add(notif)
+    db.session.commit()
+
+@app.route('/notifications')
+@login_required
+def get_notifications():
+    user = User.query.filter_by(id_number=flask_session['user_id']).first()
+    if user.is_admin:
+        notifs = Notification.query.filter_by(for_admin=True, is_read=False).order_by(Notification.created_at.desc()).all()
+    else:
+        notifs = Notification.query.filter_by(user_id=user.id, is_read=False).order_by(Notification.created_at.desc()).all()
+    return jsonify([
+        {'id': n.id, 'message': n.message, 'created_at': n.created_at.strftime('%Y-%m-%d %H:%M')} for n in notifs
+    ])
 
 if __name__ == '__main__':
     init_db()  # Initialize database and create admin user

@@ -85,6 +85,7 @@ class Session(db.Model):
     start_time = db.Column(db.DateTime, default=datetime.utcnow)
     end_time = db.Column(db.DateTime)
     status = db.Column(db.String(20), default='active')  # active, completed
+    is_manual = db.Column(db.Boolean, default=False)  # True if created by admin manually
 
     # Add relationship to Computer model
     computer = db.relationship('Computer', backref='sessions')
@@ -101,7 +102,8 @@ class Session(db.Model):
             'computer_id': self.computer_id,
             'start_time': self.start_time.strftime('%Y-%m-%d %H:%M'),
             'end_time': self.end_time.strftime('%Y-%m-%d %H:%M') if self.end_time else None,
-            'status': self.status
+            'status': self.status,
+            'is_manual': self.is_manual
         }
 
 class Reservation(db.Model):
@@ -153,4 +155,15 @@ class Computer(db.Model):
             'status': self.status,
             'laboratory_unit': self.laboratory_unit,
             'last_updated': self.last_updated.strftime('%Y-%m-%d %H:%M:%S')
-        } 
+        }
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Null for admin/global
+    user = db.relationship('User', backref='notifications', foreign_keys=[user_id])
+    message = db.Column(db.String(500), nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    for_admin = db.Column(db.Boolean, default=False)  # True for admin notifications
+    lab = db.Column(db.String(100), nullable=True)
+    pc = db.Column(db.String(100), nullable=True) 

@@ -62,124 +62,64 @@
     </nav>
 
     <div class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
         <div class="log-card">
             <h5 class="mb-3 text-center"><i class="fas fa-clipboard-list"></i> System Logs</h5>
-            <ul class="nav nav-tabs mb-4" id="logsTab" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions" type="button" role="tab" aria-controls="sessions" aria-selected="true">Sessions</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="reservations-tab" data-bs-toggle="tab" data-bs-target="#reservations" type="button" role="tab" aria-controls="reservations" aria-selected="false">Reservations</button>
-                </li>
-            </ul>
-            <div class="tab-content" id="logsTabContent">
-                <!-- Sessions Tab -->
-                <div class="tab-pane fade show active" id="sessions" role="tabpanel" aria-labelledby="sessions-tab">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Student</th>
-                                    <th>Start Time</th>
-                                    <th>End Time</th>
-                                    <th>Duration</th>
-                                    <th>Lab</th>
-                                    <th>PC</th>
-                                    <th>Purpose</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for session in sessions %}
-                                <tr>
-                                    <td>
-                                        {{ session.user.first_name }} {{ session.user.last_name }}<br>
-                                        <small class="text-muted">{{ session.user.id_number }}</small>
-                                    </td>
-                                    <td>{{ session.start_time.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td>{{ session.end_time.strftime('%Y-%m-%d %H:%M') if session.end_time else 'Ongoing' }}</td>
-                                    <td>
-                                        {% if session.end_time %}
-                                            {{ ((session.end_time - session.start_time).total_seconds() / 60)|round(0) }} min
-                                        {% else %}-{% endif %}
-                                    </td>
-                                    <td>{{ session.laboratory_unit }}</td>
-                                    <td>{{ session.computer.computer_number if session.computer else '-' }}</td>
-                                    <td>{{ session.purpose }}</td>
-                                    <td>
-                                        <span class="badge {% if session.status == 'active' %}bg-success{% else %}bg-secondary{% endif %}">
-                                            {{ session.status|title }}
-                                        </span>
-                                    </td>
-                                </tr>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Student</th>
+                            <th>Lab</th>
+                            <th>PC</th>
+                            <th>Time</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in approval_logs %}
+                        <tr>
+                            <td>
+                                {% if 'approved' in log.message %}
+                                    <span class="badge bg-success">Approved</span>
+                                {% elif 'rejected' in log.message %}
+                                    <span class="badge bg-danger">Rejected</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.user %}
+                                    {{ log.user.first_name }} {{ log.user.last_name }}<br>
+                                    <small class="text-muted">{{ log.user.id_number }}</small>
                                 {% else %}
-                                <tr>
-                                    <td colspan="8" class="text-center py-4">
-                                        <i class="fas fa-calendar-day fa-3x text-muted mb-3"></i>
-                                        <p class="text-muted">No session logs found.</p>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <!-- Reservations Tab -->
-                <div class="tab-pane fade" id="reservations" role="tabpanel" aria-labelledby="reservations-tab">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Student</th>
-                                    <th>Date</th>
-                                    <th>Time</th>
-                                    <th>Lab</th>
-                                    <th>PC</th>
-                                    <th>Purpose</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for reservation in reservations %}
-                                <tr>
-                                    <td>
-                                        {{ reservation.user.first_name }} {{ reservation.user.last_name }}<br>
-                                        <small class="text-muted">{{ reservation.user.id_number }}</small>
-                                    </td>
-                                    <td>{{ reservation.date.strftime('%Y-%m-%d') }}</td>
-                                    <td>{{ reservation.time.strftime('%H:%M') if reservation.time else reservation.time }}</td>
-                                    <td>{{ reservation.laboratory_unit }}</td>
-                                    <td>{{ reservation.computer.computer_number if reservation.computer else '-' }}</td>
-                                    <td>{{ reservation.purpose }}</td>
-                                    <td>
-                                        <span class="badge {% if reservation.status == 'approved' %}bg-success{% elif reservation.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
-                                            {{ reservation.status|title }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="7" class="text-center py-4">
-                                        <i class="fas fa-calendar-day fa-3x text-muted mb-3"></i>
-                                        <p class="text-muted">No reservation logs found.</p>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ log.message }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% for sitin in manual_sitins %}
+                        <tr>
+                            <td><span class="badge bg-primary">Manual Sit-in</span></td>
+                            <td>{{ sitin.user.first_name }} {{ sitin.user.last_name }}<br><small class="text-muted">{{ sitin.user.id_number }}</small></td>
+                            <td>{{ sitin.laboratory_unit }}</td>
+                            <td>{{ sitin.computer.computer_number if sitin.computer else '-' }}</td>
+                            <td>{{ sitin.start_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>Manual sit-in created by admin</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not approval_logs and not manual_sitins %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4">
+                                <i class="fas fa-calendar-day fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">No logs found.</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

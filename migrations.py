@@ -144,10 +144,33 @@ def migrate_computer_unique_constraint():
         db.engine.execute('ALTER TABLE computers_new RENAME TO computers')
         print('Migration complete: unique constraint is now on (computer_number, laboratory_unit)')
 
+def add_lab_pc_to_notification():
+    with app.app_context():
+        try:
+            db.engine.execute('ALTER TABLE notification ADD COLUMN lab VARCHAR(100)')
+            print("Added lab column to notification table")
+        except Exception as e:
+            print(f"Column lab may already exist: {str(e)}")
+        try:
+            db.engine.execute('ALTER TABLE notification ADD COLUMN pc VARCHAR(100)')
+            print("Added pc column to notification table")
+        except Exception as e:
+            print(f"Column pc may already exist: {str(e)}")
+
+def add_is_manual_to_sessions():
+    with app.app_context():
+        try:
+            db.engine.execute('ALTER TABLE session ADD COLUMN is_manual BOOLEAN DEFAULT FALSE')
+            print("Added is_manual column to session table")
+        except Exception as e:
+            print(f"Column is_manual may already exist: {str(e)}")
+
 if __name__ == '__main__':
     add_missing_columns()
     migrate()
     migrate_sessions()
     add_total_points_column()
     add_sessions_awarded_for_points_column()
-    migrate_computer_unique_constraint() 
+    migrate_computer_unique_constraint()
+    add_lab_pc_to_notification()
+    add_is_manual_to_sessions() 
